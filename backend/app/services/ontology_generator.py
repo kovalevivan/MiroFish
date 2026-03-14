@@ -1,6 +1,6 @@
 """
-本体生成服务
-接口1：分析文本内容，生成适合社会模拟的实体和关系类型定义
+Сервис генерации онтологии.
+Интерфейс 1: анализирует текст и строит типы сущностей и отношений для симуляции.
 """
 
 import json
@@ -8,157 +8,157 @@ from typing import Dict, Any, List, Optional
 from ..utils.llm_client import LLMClient
 
 
-# 本体生成的系统提示词
-ONTOLOGY_SYSTEM_PROMPT = """你是一个专业的知识图谱本体设计专家。你的任务是分析给定的文本内容和模拟需求，设计适合**社交媒体舆论模拟**的实体类型和关系类型。
+# Системный промт для генерации онтологии
+ONTOLOGY_SYSTEM_PROMPT = """Ты эксперт по проектированию онтологий для графов знаний. Твоя задача: проанализировать текст и требования к симуляции, а затем спроектировать типы сущностей и типы отношений для **симуляции общественной дискуссии в социальных медиа**.
 
-**重要：你必须输出有效的JSON格式数据，不要输出任何其他内容。**
+**Важно: верни только корректный JSON и ничего кроме JSON.**
 
-## 核心任务背景
+## Контекст задачи
 
-我们正在构建一个**社交媒体舆论模拟系统**。在这个系统中：
-- 每个实体都是一个可以在社交媒体上发声、互动、传播信息的"账号"或"主体"
-- 实体之间会相互影响、转发、评论、回应
-- 我们需要模拟舆论事件中各方的反应和信息传播路径
+Мы строим **систему симуляции общественного обсуждения в социальных медиа**. В этой системе:
+- каждая сущность представляет аккаунт или субъекта, который может высказываться, взаимодействовать и распространять информацию;
+- сущности влияют друг на друга, делают репосты, комментируют и отвечают;
+- нам нужно моделировать реакции сторон и траектории распространения информации.
 
-因此，**实体必须是现实中真实存在的、可以在社媒上发声和互动的主体**：
+Поэтому **сущности должны быть реальными субъектами, которые могут говорить и взаимодействовать в социальных медиа**.
 
-**可以是**：
-- 具体的个人（公众人物、当事人、意见领袖、专家学者、普通人）
-- 公司、企业（包括其官方账号）
-- 组织机构（大学、协会、NGO、工会等）
-- 政府部门、监管机构
-- 媒体机构（报纸、电视台、自媒体、网站）
-- 社交媒体平台本身
-- 特定群体代表（如校友会、粉丝团、维权群体等）
+**Допустимые сущности**:
+- конкретные люди: публичные фигуры, участники событий, лидеры мнений, эксперты, обычные пользователи;
+- компании и бизнесы, включая официальные аккаунты;
+- организации: университеты, ассоциации, НКО, профсоюзы и т.д.;
+- государственные органы и регуляторы;
+- медиа: газеты, телеканалы, сайты, независимые медиа;
+- сами платформы социальных медиа;
+- представители конкретных групп: фан-клубы, сообщества выпускников, инициативные группы и т.д.
 
-**不可以是**：
-- 抽象概念（如"舆论"、"情绪"、"趋势"）
-- 主题/话题（如"学术诚信"、"教育改革"）
-- 观点/态度（如"支持方"、"反对方"）
+**Недопустимые сущности**:
+- абстрактные понятия, например "общественное мнение", "эмоции", "тренд";
+- темы или топики, например "академическая честность", "реформа образования";
+- позиции или отношения, например "сторонники", "противники".
 
-## 输出格式
+## Формат ответа
 
-请输出JSON格式，包含以下结构：
+Верни JSON следующей структуры:
 
 ```json
 {
     "entity_types": [
         {
-            "name": "实体类型名称（英文，PascalCase）",
-            "description": "简短描述（英文，不超过100字符）",
+            "name": "название типа сущности на английском в PascalCase",
+            "description": "краткое описание на английском, до 100 символов",
             "attributes": [
                 {
-                    "name": "属性名（英文，snake_case）",
+                    "name": "имя атрибута на английском в snake_case",
                     "type": "text",
-                    "description": "属性描述"
+                    "description": "описание атрибута"
                 }
             ],
-            "examples": ["示例实体1", "示例实体2"]
+            "examples": ["пример сущности 1", "пример сущности 2"]
         }
     ],
     "edge_types": [
         {
-            "name": "关系类型名称（英文，UPPER_SNAKE_CASE）",
-            "description": "简短描述（英文，不超过100字符）",
+            "name": "название типа отношения на английском в UPPER_SNAKE_CASE",
+            "description": "краткое описание на английском, до 100 символов",
             "source_targets": [
-                {"source": "源实体类型", "target": "目标实体类型"}
+                {"source": "тип источника", "target": "тип цели"}
             ],
             "attributes": []
         }
     ],
-    "analysis_summary": "对文本内容的简要分析说明（中文）"
+    "analysis_summary": "краткий анализ содержания текста на русском"
 }
 ```
 
-## 设计指南（极其重要！）
+## Правила проектирования
 
-### 1. 实体类型设计 - 必须严格遵守
+### 1. Проектирование типов сущностей
 
-**数量要求：必须正好10个实体类型**
+**Нужно ровно 10 типов сущностей.**
 
-**层次结构要求（必须同时包含具体类型和兜底类型）**：
+**В наборе должны быть как конкретные типы, так и резервные базовые типы.**
 
-你的10个实体类型必须包含以下层次：
+Десять типов должны распределяться так:
 
-A. **兜底类型（必须包含，放在列表最后2个）**：
-   - `Person`: 任何自然人个体的兜底类型。当一个人不属于其他更具体的人物类型时，归入此类。
-   - `Organization`: 任何组织机构的兜底类型。当一个组织不属于其他更具体的组织类型时，归入此类。
+A. **Резервные типы (обязательны, должны стоять последними двумя элементами списка)**:
+   - `Person`: базовый тип для любого человека, если он не подходит под более конкретную категорию.
+   - `Organization`: базовый тип для любой организации, если она не подходит под более конкретную категорию.
 
-B. **具体类型（8个，根据文本内容设计）**：
-   - 针对文本中出现的主要角色，设计更具体的类型
-   - 例如：如果文本涉及学术事件，可以有 `Student`, `Professor`, `University`
-   - 例如：如果文本涉及商业事件，可以有 `Company`, `CEO`, `Employee`
+B. **Конкретные типы (8 штук, выводятся из содержания текста)**:
+   - выдели основные роли, которые реально встречаются в материалах;
+   - пример для академического кейса: `Student`, `Professor`, `University`;
+   - пример для бизнес-кейса: `Company`, `CEO`, `Employee`.
 
-**为什么需要兜底类型**：
-- 文本中会出现各种人物，如"中小学教师"、"路人甲"、"某位网友"
-- 如果没有专门的类型匹配，他们应该被归入 `Person`
-- 同理，小型组织、临时团体等应该归入 `Organization`
+**Зачем нужны резервные типы**:
+- в тексте всегда будут встречаться люди и организации, которые не укладываются в узкие категории;
+- такие люди должны попадать в `Person`;
+- небольшие или временные объединения должны попадать в `Organization`.
 
-**具体类型的设计原则**：
-- 从文本中识别出高频出现或关键的角色类型
-- 每个具体类型应该有明确的边界，避免重叠
-- description 必须清晰说明这个类型和兜底类型的区别
+**Принципы для конкретных типов**:
+- выбирай роли, которые часто встречаются или критичны для сценария;
+- типы должны иметь четкие границы и не дублировать друг друга;
+- в `description` обязательно поясни отличие конкретного типа от резервного.
 
-### 2. 关系类型设计
+### 2. Проектирование типов отношений
 
-- 数量：6-10个
-- 关系应该反映社媒互动中的真实联系
-- 确保关系的 source_targets 涵盖你定义的实体类型
+- количество: от 6 до 10;
+- отношения должны отражать реальные связи и взаимодействия в социальных медиа;
+- `source_targets` должны быть совместимы с определенными тобой типами сущностей.
 
-### 3. 属性设计
+### 3. Проектирование атрибутов
 
-- 每个实体类型1-3个关键属性
-- **注意**：属性名不能使用 `name`、`uuid`、`group_id`、`created_at`、`summary`（这些是系统保留字）
-- 推荐使用：`full_name`, `title`, `role`, `position`, `location`, `description` 等
+- для каждого типа сущности нужно 1-3 ключевых атрибута;
+- **нельзя** использовать зарезервированные имена: `name`, `uuid`, `group_id`, `created_at`, `summary`;
+- допустимые примеры: `full_name`, `title`, `role`, `position`, `location`, `description`.
 
-## 实体类型参考
+## Справочные примеры типов сущностей
 
-**个人类（具体）**：
-- Student: 学生
-- Professor: 教授/学者
-- Journalist: 记者
-- Celebrity: 明星/网红
-- Executive: 高管
-- Official: 政府官员
-- Lawyer: 律师
-- Doctor: 医生
+**Люди, конкретные типы**:
+- Student
+- Professor
+- Journalist
+- Celebrity
+- Executive
+- Official
+- Lawyer
+- Doctor
 
-**个人类（兜底）**：
-- Person: 任何自然人（不属于上述具体类型时使用）
+**Люди, резервный тип**:
+- Person
 
-**组织类（具体）**：
-- University: 高校
-- Company: 公司企业
-- GovernmentAgency: 政府机构
-- MediaOutlet: 媒体机构
-- Hospital: 医院
-- School: 中小学
-- NGO: 非政府组织
+**Организации, конкретные типы**:
+- University
+- Company
+- GovernmentAgency
+- MediaOutlet
+- Hospital
+- School
+- NGO
 
-**组织类（兜底）**：
-- Organization: 任何组织机构（不属于上述具体类型时使用）
+**Организации, резервный тип**:
+- Organization
 
-## 关系类型参考
+## Справочные примеры отношений
 
-- WORKS_FOR: 工作于
-- STUDIES_AT: 就读于
-- AFFILIATED_WITH: 隶属于
-- REPRESENTS: 代表
-- REGULATES: 监管
-- REPORTS_ON: 报道
-- COMMENTS_ON: 评论
-- RESPONDS_TO: 回应
-- SUPPORTS: 支持
-- OPPOSES: 反对
-- COLLABORATES_WITH: 合作
-- COMPETES_WITH: 竞争
+- WORKS_FOR
+- STUDIES_AT
+- AFFILIATED_WITH
+- REPRESENTS
+- REGULATES
+- REPORTS_ON
+- COMMENTS_ON
+- RESPONDS_TO
+- SUPPORTS
+- OPPOSES
+- COLLABORATES_WITH
+- COMPETES_WITH
 """
 
 
 class OntologyGenerator:
     """
-    本体生成器
-    分析文本内容，生成实体和关系类型定义
+    Генератор онтологии.
+    Анализирует тексты и строит определения типов сущностей и отношений.
     """
     
     def __init__(self, llm_client: Optional[LLMClient] = None):
@@ -171,17 +171,17 @@ class OntologyGenerator:
         additional_context: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        生成本体定义
-        
+        Генерирует онтологию.
+
         Args:
-            document_texts: 文档文本列表
-            simulation_requirement: 模拟需求描述
-            additional_context: 额外上下文
-            
+            document_texts: список текстов документов
+            simulation_requirement: описание задачи симуляции
+            additional_context: дополнительный контекст
+
         Returns:
-            本体定义（entity_types, edge_types等）
+            словарь онтологии с entity_types, edge_types и analysis_summary
         """
-        # 构建用户消息
+        # Формируем пользовательское сообщение
         user_message = self._build_user_message(
             document_texts, 
             simulation_requirement,
@@ -193,19 +193,19 @@ class OntologyGenerator:
             {"role": "user", "content": user_message}
         ]
         
-        # 调用LLM
+        # Вызываем LLM
         result = self.llm_client.chat_json(
             messages=messages,
             temperature=0.3,
             max_tokens=4096
         )
         
-        # 验证和后处理
+        # Валидация и постобработка
         result = self._validate_and_process(result)
         
         return result
     
-    # 传给 LLM 的文本最大长度（5万字）
+    # Максимальная длина текста, отправляемого в LLM
     MAX_TEXT_LENGTH_FOR_LLM = 50000
     
     def _build_user_message(
@@ -214,50 +214,53 @@ class OntologyGenerator:
         simulation_requirement: str,
         additional_context: Optional[str]
     ) -> str:
-        """构建用户消息"""
+        """Формирует пользовательское сообщение."""
         
-        # 合并文本
+        # Объединяем тексты
         combined_text = "\n\n---\n\n".join(document_texts)
         original_length = len(combined_text)
         
-        # 如果文本超过5万字，截断（仅影响传给LLM的内容，不影响图谱构建）
+        # Если текст слишком длинный, обрезаем только LLM-контекст
         if len(combined_text) > self.MAX_TEXT_LENGTH_FOR_LLM:
             combined_text = combined_text[:self.MAX_TEXT_LENGTH_FOR_LLM]
-            combined_text += f"\n\n...(原文共{original_length}字，已截取前{self.MAX_TEXT_LENGTH_FOR_LLM}字用于本体分析)..."
-        
-        message = f"""## 模拟需求
+            combined_text += (
+                f"\n\n...(исходный текст содержит {original_length} символов; "
+                f"для анализа онтологии использованы первые {self.MAX_TEXT_LENGTH_FOR_LLM})..."
+            )
+
+        message = f"""## Требование к симуляции
 
 {simulation_requirement}
 
-## 文档内容
+## Содержимое документов
 
 {combined_text}
 """
         
         if additional_context:
             message += f"""
-## 额外说明
+## Дополнительные пояснения
 
 {additional_context}
 """
         
         message += """
-请根据以上内容，设计适合社会舆论模拟的实体类型和关系类型。
+На основе материалов выше спроектируй типы сущностей и типы отношений для симуляции общественной дискуссии.
 
-**必须遵守的规则**：
-1. 必须正好输出10个实体类型
-2. 最后2个必须是兜底类型：Person（个人兜底）和 Organization（组织兜底）
-3. 前8个是根据文本内容设计的具体类型
-4. 所有实体类型必须是现实中可以发声的主体，不能是抽象概念
-5. 属性名不能使用 name、uuid、group_id 等保留字，用 full_name、org_name 等替代
+**Обязательные правила**:
+1. Верни ровно 10 типов сущностей.
+2. Последние два типа обязательно должны быть `Person` и `Organization`.
+3. Первые восемь типов должны быть конкретными и вытекать из текста.
+4. Все типы сущностей должны описывать реальных субъектов, а не абстрактные понятия.
+5. Для атрибутов нельзя использовать зарезервированные имена вроде `name`, `uuid`, `group_id`; используй альтернативы вроде `full_name` и `org_name`.
 """
         
         return message
     
     def _validate_and_process(self, result: Dict[str, Any]) -> Dict[str, Any]:
-        """验证和后处理结果"""
+        """Проверяет и нормализует результат."""
         
-        # 确保必要字段存在
+        # Гарантируем наличие обязательных полей
         if "entity_types" not in result:
             result["entity_types"] = []
         if "edge_types" not in result:
@@ -265,17 +268,17 @@ class OntologyGenerator:
         if "analysis_summary" not in result:
             result["analysis_summary"] = ""
         
-        # 验证实体类型
+        # Проверяем типы сущностей
         for entity in result["entity_types"]:
             if "attributes" not in entity:
                 entity["attributes"] = []
             if "examples" not in entity:
                 entity["examples"] = []
-            # 确保description不超过100字符
+            # Ограничиваем длину description
             if len(entity.get("description", "")) > 100:
                 entity["description"] = entity["description"][:97] + "..."
         
-        # 验证关系类型
+        # Проверяем типы отношений
         for edge in result["edge_types"]:
             if "source_targets" not in edge:
                 edge["source_targets"] = []
@@ -284,11 +287,11 @@ class OntologyGenerator:
             if len(edge.get("description", "")) > 100:
                 edge["description"] = edge["description"][:97] + "..."
         
-        # Zep API 限制：最多 10 个自定义实体类型，最多 10 个自定义边类型
+        # Ограничения Zep API: максимум 10 типов сущностей и 10 типов связей
         MAX_ENTITY_TYPES = 10
         MAX_EDGE_TYPES = 10
         
-        # 兜底类型定义
+        # Резервные типы
         person_fallback = {
             "name": "Person",
             "description": "Any individual person not fitting other specific person types.",
@@ -309,12 +312,12 @@ class OntologyGenerator:
             "examples": ["small business", "community group"]
         }
         
-        # 检查是否已有兜底类型
+        # Проверяем, присутствуют ли резервные типы
         entity_names = {e["name"] for e in result["entity_types"]}
         has_person = "Person" in entity_names
         has_organization = "Organization" in entity_names
         
-        # 需要添加的兜底类型
+        # Определяем, какие резервные типы нужно добавить
         fallbacks_to_add = []
         if not has_person:
             fallbacks_to_add.append(person_fallback)
@@ -325,17 +328,17 @@ class OntologyGenerator:
             current_count = len(result["entity_types"])
             needed_slots = len(fallbacks_to_add)
             
-            # 如果添加后会超过 10 个，需要移除一些现有类型
+            # Если после добавления будет больше 10 типов, убираем лишние
             if current_count + needed_slots > MAX_ENTITY_TYPES:
-                # 计算需要移除多少个
+                # Сколько типов нужно убрать
                 to_remove = current_count + needed_slots - MAX_ENTITY_TYPES
-                # 从末尾移除（保留前面更重要的具体类型）
+                # Удаляем с конца, сохраняя более приоритетные конкретные типы
                 result["entity_types"] = result["entity_types"][:-to_remove]
             
-            # 添加兜底类型
+            # Добавляем резервные типы
             result["entity_types"].extend(fallbacks_to_add)
         
-        # 最终确保不超过限制（防御性编程）
+        # Финальная защитная нормализация по лимитам
         if len(result["entity_types"]) > MAX_ENTITY_TYPES:
             result["entity_types"] = result["entity_types"][:MAX_ENTITY_TYPES]
         
@@ -346,29 +349,29 @@ class OntologyGenerator:
     
     def generate_python_code(self, ontology: Dict[str, Any]) -> str:
         """
-        将本体定义转换为Python代码（类似ontology.py）
-        
+        Преобразует онтологию в Python-код по образцу `ontology.py`.
+
         Args:
-            ontology: 本体定义
-            
+            ontology: определение онтологии
+
         Returns:
-            Python代码字符串
+            строка с Python-кодом
         """
         code_lines = [
             '"""',
-            '自定义实体类型定义',
-            '由MiroFish自动生成，用于社会舆论模拟',
+            'Определения пользовательских типов сущностей',
+            'Автоматически сгенерировано MiroFish для социальной симуляции',
             '"""',
             '',
             'from pydantic import Field',
             'from zep_cloud.external_clients.ontology import EntityModel, EntityText, EdgeModel',
             '',
             '',
-            '# ============== 实体类型定义 ==============',
+            '# ============== Определения типов сущностей ==============',
             '',
         ]
         
-        # 生成实体类型
+        # Генерация типов сущностей
         for entity in ontology.get("entity_types", []):
             name = entity["name"]
             desc = entity.get("description", f"A {name} entity.")
@@ -391,10 +394,10 @@ class OntologyGenerator:
             code_lines.append('')
             code_lines.append('')
         
-        code_lines.append('# ============== 关系类型定义 ==============')
+        code_lines.append('# ============== Определения типов отношений ==============')
         code_lines.append('')
         
-        # 生成关系类型
+        # Генерация типов отношений
         for edge in ontology.get("edge_types", []):
             name = edge["name"]
             # 转换为PascalCase类名
@@ -420,7 +423,7 @@ class OntologyGenerator:
             code_lines.append('')
         
         # 生成类型字典
-        code_lines.append('# ============== 类型配置 ==============')
+        code_lines.append('# ============== Конфигурация типов ==============')
         code_lines.append('')
         code_lines.append('ENTITY_TYPES = {')
         for entity in ontology.get("entity_types", []):
@@ -450,4 +453,3 @@ class OntologyGenerator:
         code_lines.append('}')
         
         return '\n'.join(code_lines)
-

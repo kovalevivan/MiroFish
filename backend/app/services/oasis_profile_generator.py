@@ -1,11 +1,6 @@
 """
-OASIS Agent Profile生成器
-将Zep图谱中的实体转换为OASIS模拟平台所需的Agent Profile格式
-
-优化改进：
-1. 调用Zep检索功能二次丰富节点信息
-2. 优化提示词生成非常详细的人设
-3. 区分个人实体和抽象群体实体
+Генератор Agent Profile для OASIS.
+Преобразует сущности из графа Zep в профили агентов для симуляции.
 """
 
 import json
@@ -27,23 +22,23 @@ logger = get_logger('mirofish.oasis_profile')
 
 @dataclass
 class OasisAgentProfile:
-    """OASIS Agent Profile数据结构"""
-    # 通用字段
+    """Структура профиля агента OASIS."""
+    # Общие поля
     user_id: int
     user_name: str
     name: str
     bio: str
     persona: str
     
-    # 可选字段 - Reddit风格
+    # Дополнительные поля для Reddit
     karma: int = 1000
     
-    # 可选字段 - Twitter风格
+    # Дополнительные поля для Twitter
     friend_count: int = 100
     follower_count: int = 150
     statuses_count: int = 500
     
-    # 额外人设信息
+    # Дополнительная информация о персонаже
     age: Optional[int] = None
     gender: Optional[str] = None
     mbti: Optional[str] = None
@@ -51,17 +46,17 @@ class OasisAgentProfile:
     profession: Optional[str] = None
     interested_topics: List[str] = field(default_factory=list)
     
-    # 来源实体信息
+    # Данные об исходной сущности
     source_entity_uuid: Optional[str] = None
     source_entity_type: Optional[str] = None
     
     created_at: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
     
     def to_reddit_format(self) -> Dict[str, Any]:
-        """转换为Reddit平台格式"""
+        """Преобразует профиль в формат Reddit."""
         profile = {
             "user_id": self.user_id,
-            "username": self.user_name,  # OASIS 库要求字段名为 username（无下划线）
+            "username": self.user_name,
             "name": self.name,
             "bio": self.bio,
             "persona": self.persona,
@@ -69,7 +64,7 @@ class OasisAgentProfile:
             "created_at": self.created_at,
         }
         
-        # 添加额外人设信息（如果有）
+        # Добавляем расширенные поля, если они заданы
         if self.age:
             profile["age"] = self.age
         if self.gender:
@@ -86,10 +81,10 @@ class OasisAgentProfile:
         return profile
     
     def to_twitter_format(self) -> Dict[str, Any]:
-        """转换为Twitter平台格式"""
+        """Преобразует профиль в формат Twitter."""
         profile = {
             "user_id": self.user_id,
-            "username": self.user_name,  # OASIS 库要求字段名为 username（无下划线）
+            "username": self.user_name,
             "name": self.name,
             "bio": self.bio,
             "persona": self.persona,
@@ -99,7 +94,7 @@ class OasisAgentProfile:
             "created_at": self.created_at,
         }
         
-        # 添加额外人设信息
+        # Добавляем расширенные поля
         if self.age:
             profile["age"] = self.age
         if self.gender:
@@ -116,7 +111,7 @@ class OasisAgentProfile:
         return profile
     
     def to_dict(self) -> Dict[str, Any]:
-        """转换为完整字典格式"""
+        """Преобразует профиль в полный словарь."""
         return {
             "user_id": self.user_id,
             "user_name": self.user_name,
@@ -141,17 +136,13 @@ class OasisAgentProfile:
 
 class OasisProfileGenerator:
     """
-    OASIS Profile生成器
-    
-    将Zep图谱中的实体转换为OASIS模拟所需的Agent Profile
-    
-    优化特性：
-    1. 调用Zep图谱检索功能获取更丰富的上下文
-    2. 生成非常详细的人设（包括基本信息、职业经历、性格特征、社交媒体行为等）
-    3. 区分个人实体和抽象群体实体
+    Генератор профилей OASIS.
+
+    Преобразует сущности графа Zep в профили агентов для симуляции и,
+    при необходимости, расширяет контекст через Zep и LLM.
     """
     
-    # MBTI类型列表
+    # Список MBTI
     MBTI_TYPES = [
         "INTJ", "INTP", "ENTJ", "ENTP",
         "INFJ", "INFP", "ENFJ", "ENFP",
@@ -159,19 +150,19 @@ class OasisProfileGenerator:
         "ISTP", "ISFP", "ESTP", "ESFP"
     ]
     
-    # 常见国家列表
+    # Часто используемые страны по умолчанию
     COUNTRIES = [
         "China", "US", "UK", "Japan", "Germany", "France", 
         "Canada", "Australia", "Brazil", "India", "South Korea"
     ]
     
-    # 个人类型实体（需要生成具体人设）
+    # Персональные сущности
     INDIVIDUAL_ENTITY_TYPES = [
         "student", "alumni", "professor", "person", "publicfigure", 
         "expert", "faculty", "official", "journalist", "activist"
     ]
     
-    # 群体/机构类型实体（需要生成群体代表人设）
+    # Группы и институции
     GROUP_ENTITY_TYPES = [
         "university", "governmentagency", "organization", "ngo", 
         "mediaoutlet", "company", "institution", "group", "community"
@@ -190,14 +181,14 @@ class OasisProfileGenerator:
         self.model_name = model_name or Config.LLM_MODEL_NAME
         
         if not self.api_key:
-            raise ValueError("LLM_API_KEY 未配置")
+            raise ValueError("LLM_API_KEY не настроен")
         
         self.client = OpenAI(
             api_key=self.api_key,
             base_url=self.base_url
         )
         
-        # Zep客户端用于检索丰富上下文
+        # Клиент Zep для дополнительного контекста
         self.zep_api_key = zep_api_key or Config.ZEP_API_KEY
         self.zep_client = None
         self.graph_id = graph_id
@@ -206,7 +197,7 @@ class OasisProfileGenerator:
             try:
                 self.zep_client = Zep(api_key=self.zep_api_key)
             except Exception as e:
-                logger.warning(f"Zep客户端初始化失败: {e}")
+                logger.warning(f"Не удалось инициализировать клиент Zep: {e}")
     
     def generate_profile_from_entity(
         self, 
@@ -214,28 +205,18 @@ class OasisProfileGenerator:
         user_id: int,
         use_llm: bool = True
     ) -> OasisAgentProfile:
-        """
-        从Zep实体生成OASIS Agent Profile
-        
-        Args:
-            entity: Zep实体节点
-            user_id: 用户ID（用于OASIS）
-            use_llm: 是否使用LLM生成详细人设
-            
-        Returns:
-            OasisAgentProfile
-        """
+        """Создает OASIS Agent Profile из сущности Zep."""
         entity_type = entity.get_entity_type() or "Entity"
         
-        # 基础信息
+        # Базовая информация
         name = entity.name
         user_name = self._generate_username(name)
         
-        # 构建上下文信息
+        # Формируем контекст
         context = self._build_entity_context(entity)
         
         if use_llm:
-            # 使用LLM生成详细人设
+            # Генерация подробного профиля через LLM
             profile_data = self._generate_profile_with_llm(
                 entity_name=name,
                 entity_type=entity_type,
@@ -244,7 +225,7 @@ class OasisProfileGenerator:
                 context=context
             )
         else:
-            # 使用规则生成基础人设
+            # Шаблонная генерация профиля
             profile_data = self._generate_profile_rule_based(
                 entity_name=name,
                 entity_type=entity_type,
@@ -273,7 +254,7 @@ class OasisProfileGenerator:
         )
     
     def _generate_username(self, name: str) -> str:
-        """生成用户名"""
+        """Генерирует имя пользователя."""
         # 移除特殊字符，转换为小写
         username = name.lower().replace(" ", "_")
         username = ''.join(c for c in username if c.isalnum() or c == '_')
@@ -310,13 +291,13 @@ class OasisProfileGenerator:
         
         # 必须有graph_id才能进行搜索
         if not self.graph_id:
-            logger.debug(f"跳过Zep检索：未设置graph_id")
+            logger.debug("Пропускаю поиск в Zep: graph_id не задан")
             return results
         
-        comprehensive_query = f"关于{entity_name}的所有信息、活动、事件、关系和背景"
+        comprehensive_query = f"Вся информация, действия, события, связи и контекст, связанные с {entity_name}"
         
         def search_edges():
-            """搜索边（事实/关系）- 带重试机制"""
+            """Ищет ребра (факты и связи) с повторными попытками."""
             max_retries = 3
             last_exception = None
             delay = 2.0
@@ -333,15 +314,15 @@ class OasisProfileGenerator:
                 except Exception as e:
                     last_exception = e
                     if attempt < max_retries - 1:
-                        logger.debug(f"Zep边搜索第 {attempt + 1} 次失败: {str(e)[:80]}, 重试中...")
+                        logger.debug(f"Ошибка поиска связей в Zep, попытка {attempt + 1}: {str(e)[:80]}, повторяю...")
                         time.sleep(delay)
                         delay *= 2
                     else:
-                        logger.debug(f"Zep边搜索在 {max_retries} 次尝试后仍失败: {e}")
+                        logger.debug(f"Поиск связей в Zep не удался после {max_retries} попыток: {e}")
             return None
         
         def search_nodes():
-            """搜索节点（实体摘要）- 带重试机制"""
+            """Ищет узлы (сводки сущностей) с повторными попытками."""
             max_retries = 3
             last_exception = None
             delay = 2.0
@@ -358,11 +339,11 @@ class OasisProfileGenerator:
                 except Exception as e:
                     last_exception = e
                     if attempt < max_retries - 1:
-                        logger.debug(f"Zep节点搜索第 {attempt + 1} 次失败: {str(e)[:80]}, 重试中...")
+                        logger.debug(f"Ошибка поиска узлов в Zep, попытка {attempt + 1}: {str(e)[:80]}, повторяю...")
                         time.sleep(delay)
                         delay *= 2
                     else:
-                        logger.debug(f"Zep节点搜索在 {max_retries} 次尝试后仍失败: {e}")
+                        logger.debug(f"Поиск узлов в Zep не удался после {max_retries} попыток: {e}")
             return None
         
         try:
@@ -390,23 +371,23 @@ class OasisProfileGenerator:
                     if hasattr(node, 'summary') and node.summary:
                         all_summaries.add(node.summary)
                     if hasattr(node, 'name') and node.name and node.name != entity_name:
-                        all_summaries.add(f"相关实体: {node.name}")
+                        all_summaries.add(f"Связанная сущность: {node.name}")
             results["node_summaries"] = list(all_summaries)
             
             # 构建综合上下文
             context_parts = []
             if results["facts"]:
-                context_parts.append("事实信息:\n" + "\n".join(f"- {f}" for f in results["facts"][:20]))
+                context_parts.append("Факты:\n" + "\n".join(f"- {f}" for f in results["facts"][:20]))
             if results["node_summaries"]:
-                context_parts.append("相关实体:\n" + "\n".join(f"- {s}" for s in results["node_summaries"][:10]))
+                context_parts.append("Связанные сущности:\n" + "\n".join(f"- {s}" for s in results["node_summaries"][:10]))
             results["context"] = "\n\n".join(context_parts)
             
-            logger.info(f"Zep混合检索完成: {entity_name}, 获取 {len(results['facts'])} 条事实, {len(results['node_summaries'])} 个相关节点")
+            logger.info(f"Смешанный поиск Zep завершен: {entity_name}, фактов {len(results['facts'])}, связанных узлов {len(results['node_summaries'])}")
             
         except concurrent.futures.TimeoutError:
-            logger.warning(f"Zep检索超时 ({entity_name})")
+            logger.warning(f"Таймаут поиска в Zep ({entity_name})")
         except Exception as e:
-            logger.warning(f"Zep检索失败 ({entity_name}): {e}")
+            logger.warning(f"Ошибка поиска в Zep ({entity_name}): {e}")
         
         return results
     
@@ -428,7 +409,7 @@ class OasisProfileGenerator:
                 if value and str(value).strip():
                     attrs.append(f"- {key}: {value}")
             if attrs:
-                context_parts.append("### 实体属性\n" + "\n".join(attrs))
+                context_parts.append("### Атрибуты сущности\n" + "\n".join(attrs))
         
         # 2. 添加相关边信息（事实/关系）
         existing_facts = set()
@@ -444,12 +425,12 @@ class OasisProfileGenerator:
                     existing_facts.add(fact)
                 elif edge_name:
                     if direction == "outgoing":
-                        relationships.append(f"- {entity.name} --[{edge_name}]--> (相关实体)")
+                        relationships.append(f"- {entity.name} --[{edge_name}]--> (связанная сущность)")
                     else:
-                        relationships.append(f"- (相关实体) --[{edge_name}]--> {entity.name}")
+                        relationships.append(f"- (связанная сущность) --[{edge_name}]--> {entity.name}")
             
             if relationships:
-                context_parts.append("### 相关事实和关系\n" + "\n".join(relationships))
+                context_parts.append("### Связанные факты и отношения\n" + "\n".join(relationships))
         
         # 3. 添加关联节点的详细信息
         if entity.related_nodes:
@@ -469,7 +450,7 @@ class OasisProfileGenerator:
                     related_info.append(f"- **{node_name}**{label_str}")
             
             if related_info:
-                context_parts.append("### 关联实体信息\n" + "\n".join(related_info))
+                context_parts.append("### Информация о связанных сущностях\n" + "\n".join(related_info))
         
         # 4. 使用Zep混合检索获取更丰富的信息
         zep_results = self._search_zep_for_entity(entity)
@@ -478,19 +459,19 @@ class OasisProfileGenerator:
             # 去重：排除已存在的事实
             new_facts = [f for f in zep_results["facts"] if f not in existing_facts]
             if new_facts:
-                context_parts.append("### Zep检索到的事实信息\n" + "\n".join(f"- {f}" for f in new_facts[:15]))
+                context_parts.append("### Факты, найденные через Zep\n" + "\n".join(f"- {f}" for f in new_facts[:15]))
         
         if zep_results.get("node_summaries"):
-            context_parts.append("### Zep检索到的相关节点\n" + "\n".join(f"- {s}" for s in zep_results["node_summaries"][:10]))
+            context_parts.append("### Узлы, найденные через Zep\n" + "\n".join(f"- {s}" for s in zep_results["node_summaries"][:10]))
         
         return "\n\n".join(context_parts)
     
     def _is_individual_entity(self, entity_type: str) -> bool:
-        """判断是否是个人类型实体"""
+        """Проверяет, относится ли сущность к персональному типу."""
         return entity_type.lower() in self.INDIVIDUAL_ENTITY_TYPES
     
     def _is_group_entity(self, entity_type: str) -> bool:
-        """判断是否是群体/机构类型实体"""
+        """Проверяет, относится ли сущность к группе или организации."""
         return entity_type.lower() in self.GROUP_ENTITY_TYPES
     
     def _generate_profile_with_llm(
@@ -542,7 +523,7 @@ class OasisProfileGenerator:
                 # 检查是否被截断（finish_reason不是'stop'）
                 finish_reason = response.choices[0].finish_reason
                 if finish_reason == 'length':
-                    logger.warning(f"LLM输出被截断 (attempt {attempt+1}), 尝试修复...")
+                    logger.warning(f"Вывод LLM был обрезан (attempt {attempt+1}), пробую восстановить...")
                     content = self._fix_truncated_json(content)
                 
                 # 尝试解析JSON
@@ -553,12 +534,12 @@ class OasisProfileGenerator:
                     if "bio" not in result or not result["bio"]:
                         result["bio"] = entity_summary[:200] if entity_summary else f"{entity_type}: {entity_name}"
                     if "persona" not in result or not result["persona"]:
-                        result["persona"] = entity_summary or f"{entity_name}是一个{entity_type}。"
+                        result["persona"] = entity_summary or f"{entity_name} — это {entity_type}."
                     
                     return result
                     
                 except json.JSONDecodeError as je:
-                    logger.warning(f"JSON解析失败 (attempt {attempt+1}): {str(je)[:80]}")
+                    logger.warning(f"Не удалось разобрать JSON (attempt {attempt+1}): {str(je)[:80]}")
                     
                     # 尝试修复JSON
                     result = self._try_fix_json(content, entity_name, entity_type, entity_summary)
@@ -569,18 +550,18 @@ class OasisProfileGenerator:
                     last_error = je
                     
             except Exception as e:
-                logger.warning(f"LLM调用失败 (attempt {attempt+1}): {str(e)[:80]}")
+                logger.warning(f"Ошибка вызова LLM (attempt {attempt+1}): {str(e)[:80]}")
                 last_error = e
                 import time
                 time.sleep(1 * (attempt + 1))  # 指数退避
         
-        logger.warning(f"LLM生成人设失败（{max_attempts}次尝试）: {last_error}, 使用规则生成")
+        logger.warning(f"Не удалось сгенерировать профиль через LLM после {max_attempts} попыток: {last_error}. Перехожу к шаблонной генерации.")
         return self._generate_profile_rule_based(
             entity_name, entity_type, entity_summary, entity_attributes
         )
     
     def _fix_truncated_json(self, content: str) -> str:
-        """修复被截断的JSON（输出被max_tokens限制截断）"""
+        """Пытается восстановить JSON, обрезанный лимитом max_tokens."""
         import re
         
         # 如果JSON被截断，尝试闭合它
@@ -603,7 +584,7 @@ class OasisProfileGenerator:
         return content
     
     def _try_fix_json(self, content: str, entity_name: str, entity_type: str, entity_summary: str = "") -> Dict[str, Any]:
-        """尝试修复损坏的JSON"""
+        """Пытается починить поврежденный JSON."""
         import re
         
         # 1. 首先尝试修复被截断的情况
@@ -650,11 +631,11 @@ class OasisProfileGenerator:
         persona_match = re.search(r'"persona"\s*:\s*"([^"]*)', content)  # 可能被截断
         
         bio = bio_match.group(1) if bio_match else (entity_summary[:200] if entity_summary else f"{entity_type}: {entity_name}")
-        persona = persona_match.group(1) if persona_match else (entity_summary or f"{entity_name}是一个{entity_type}。")
+        persona = persona_match.group(1) if persona_match else (entity_summary or f"{entity_name} — это {entity_type}.")
         
         # 如果提取到了有意义的内容，标记为已修复
         if bio_match or persona_match:
-            logger.info(f"从损坏的JSON中提取了部分信息")
+            logger.info("Удалось извлечь часть данных из поврежденного JSON")
             return {
                 "bio": bio,
                 "persona": persona,
@@ -662,15 +643,15 @@ class OasisProfileGenerator:
             }
         
         # 7. 完全失败，返回基础结构
-        logger.warning(f"JSON修复失败，返回基础结构")
+        logger.warning("Не удалось восстановить JSON, возвращаю базовую структуру")
         return {
             "bio": entity_summary[:200] if entity_summary else f"{entity_type}: {entity_name}",
-            "persona": entity_summary or f"{entity_name}是一个{entity_type}。"
+            "persona": entity_summary or f"{entity_name} — это {entity_type}."
         }
     
     def _get_system_prompt(self, is_individual: bool) -> str:
-        """获取系统提示词"""
-        base_prompt = "你是社交媒体用户画像生成专家。生成详细、真实的人设用于舆论模拟,最大程度还原已有现实情况。必须返回有效的JSON格式，所有字符串值不能包含未转义的换行符。使用中文。"
+        """Возвращает системный prompt."""
+        base_prompt = "Ты эксперт по созданию реалистичных профилей пользователей соцсетей для симуляции общественных реакций. Сгенерируй детализированный и правдоподобный профиль на русском языке. Возвращай только валидный JSON. Значения строк не должны содержать необработанные переводы строк."
         return base_prompt
     
     def _build_individual_persona_prompt(
@@ -681,45 +662,45 @@ class OasisProfileGenerator:
         entity_attributes: Dict[str, Any],
         context: str
     ) -> str:
-        """构建个人实体的详细人设提示词"""
+        """Строит подробный prompt для персональной сущности."""
         
-        attrs_str = json.dumps(entity_attributes, ensure_ascii=False) if entity_attributes else "无"
-        context_str = context[:3000] if context else "无额外上下文"
+        attrs_str = json.dumps(entity_attributes, ensure_ascii=False) if entity_attributes else "нет"
+        context_str = context[:3000] if context else "дополнительный контекст отсутствует"
         
-        return f"""为实体生成详细的社交媒体用户人设,最大程度还原已有现实情况。
+        return f"""Сгенерируй подробный профиль пользователя соцсетей для сущности и максимально опирайся на уже известный контекст.
 
-实体名称: {entity_name}
-实体类型: {entity_type}
-实体摘要: {entity_summary}
-实体属性: {attrs_str}
+Название сущности: {entity_name}
+Тип сущности: {entity_type}
+Краткое описание: {entity_summary}
+Атрибуты: {attrs_str}
 
-上下文信息:
+Контекст:
 {context_str}
 
-请生成JSON，包含以下字段:
+Верни JSON со следующими полями:
 
-1. bio: 社交媒体简介，200字
-2. persona: 详细人设描述（2000字的纯文本），需包含:
-   - 基本信息（年龄、职业、教育背景、所在地）
-   - 人物背景（重要经历、与事件的关联、社会关系）
-   - 性格特征（MBTI类型、核心性格、情绪表达方式）
-   - 社交媒体行为（发帖频率、内容偏好、互动风格、语言特点）
-   - 立场观点（对话题的态度、可能被激怒/感动的内容）
-   - 独特特征（口头禅、特殊经历、个人爱好）
-   - 个人记忆（人设的重要部分，要介绍这个个体与事件的关联，以及这个个体在事件中的已有动作与反应）
-3. age: 年龄数字（必须是整数）
-4. gender: 性别，必须是英文: "male" 或 "female"
-5. mbti: MBTI类型（如INTJ、ENFP等）
-6. country: 国家（使用中文，如"中国"）
-7. profession: 职业
-8. interested_topics: 感兴趣话题数组
+1. bio: краткое описание профиля для соцсети, около 200 символов
+2. persona: подробное описание персонажа сплошным текстом, включи:
+   - базовые сведения: возраст, профессию, образование, место проживания
+   - биографию: важные эпизоды, связь с событием, социальные связи
+   - характер: тип MBTI, ключевые черты, способ выражения эмоций
+   - поведение в соцсетях: частоту публикаций, любимые темы, стиль общения, языковые особенности
+   - позицию по теме: отношение к обсуждаемому вопросу, что может его задеть или вдохновить
+   - отличительные детали: любимые выражения, особый опыт, увлечения
+   - личную память: как персонаж связан с событием и что уже делал или как реагировал
+3. age: целое число
+4. gender: только "male" или "female"
+5. mbti: тип MBTI, например INTJ или ENFP
+6. country: страна на русском языке
+7. profession: профессия
+8. interested_topics: массив интересующих тем
 
-重要:
-- 所有字段值必须是字符串或数字，不要使用换行符
-- persona必须是一段连贯的文字描述
-- 使用中文（除了gender字段必须用英文male/female）
-- 内容要与实体信息保持一致
-- age必须是有效的整数，gender必须是"male"或"female"
+Важно:
+- значения всех полей должны быть строками, числами или массивом строк без переводов строк внутри значений
+- persona должна быть одним связным абзацем
+- весь текст на русском, кроме gender
+- содержание должно строго соответствовать исходной сущности
+- age должен быть корректным целым числом, gender только "male" или "female"
 """
 
     def _build_group_persona_prompt(
@@ -730,45 +711,45 @@ class OasisProfileGenerator:
         entity_attributes: Dict[str, Any],
         context: str
     ) -> str:
-        """构建群体/机构实体的详细人设提示词"""
+        """Строит подробный prompt для группы или организации."""
         
-        attrs_str = json.dumps(entity_attributes, ensure_ascii=False) if entity_attributes else "无"
-        context_str = context[:3000] if context else "无额外上下文"
+        attrs_str = json.dumps(entity_attributes, ensure_ascii=False) if entity_attributes else "нет"
+        context_str = context[:3000] if context else "дополнительный контекст отсутствует"
         
-        return f"""为机构/群体实体生成详细的社交媒体账号设定,最大程度还原已有现实情况。
+        return f"""Сгенерируй подробный профиль аккаунта для институции или группы, максимально опираясь на известный контекст.
 
-实体名称: {entity_name}
-实体类型: {entity_type}
-实体摘要: {entity_summary}
-实体属性: {attrs_str}
+Название сущности: {entity_name}
+Тип сущности: {entity_type}
+Краткое описание: {entity_summary}
+Атрибуты: {attrs_str}
 
-上下文信息:
+Контекст:
 {context_str}
 
-请生成JSON，包含以下字段:
+Верни JSON со следующими полями:
 
-1. bio: 官方账号简介，200字，专业得体
-2. persona: 详细账号设定描述（2000字的纯文本），需包含:
-   - 机构基本信息（正式名称、机构性质、成立背景、主要职能）
-   - 账号定位（账号类型、目标受众、核心功能）
-   - 发言风格（语言特点、常用表达、禁忌话题）
-   - 发布内容特点（内容类型、发布频率、活跃时间段）
-   - 立场态度（对核心话题的官方立场、面对争议的处理方式）
-   - 特殊说明（代表的群体画像、运营习惯）
-   - 机构记忆（机构人设的重要部分，要介绍这个机构与事件的关联，以及这个机构在事件中的已有动作与反应）
-3. age: 固定填30（机构账号的虚拟年龄）
-4. gender: 固定填"other"（机构账号使用other表示非个人）
-5. mbti: MBTI类型，用于描述账号风格，如ISTJ代表严谨保守
-6. country: 国家（使用中文，如"中国"）
-7. profession: 机构职能描述
-8. interested_topics: 关注领域数组
+1. bio: краткое описание официального аккаунта, сдержанное и профессиональное
+2. persona: подробное описание аккаунта сплошным текстом, включи:
+   - сведения об организации: официальное название, природу организации, происхождение, основные функции
+   - позиционирование аккаунта: тип аккаунта, целевую аудиторию, ключевую задачу
+   - стиль коммуникации: характер формулировок, частые обороты, чувствительные темы
+   - тип контента: что публикует, как часто, в какие периоды особенно активен
+   - институциональную позицию: отношение к ключевым вопросам и способ реакции на споры
+   - особые примечания: кого представляет, какие у команды привычки ведения аккаунта
+   - институциональную память: как организация связана с событием и какие шаги или реакции уже проявляла
+3. age: всегда 30
+4. gender: всегда "other"
+5. mbti: тип MBTI для описания стиля аккаунта
+6. country: страна на русском языке
+7. profession: описание функции или роли организации
+8. interested_topics: массив основных тематик
 
-重要:
-- 所有字段值必须是字符串或数字，不允许null值
-- persona必须是一段连贯的文字描述，不要使用换行符
-- 使用中文（除了gender字段必须用英文"other"）
-- age必须是整数30，gender必须是字符串"other"
-- 机构账号发言要符合其身份定位"""
+Важно:
+- все значения должны быть строками, числами или массивом строк, без null
+- persona должна быть одним связным абзацем без переводов строк
+- весь текст на русском, кроме gender="other"
+- age должен быть равен 30, gender должен быть строкой "other"
+- тон и содержание должны соответствовать типу институции"""
     
     def _generate_profile_rule_based(
         self,
@@ -777,9 +758,9 @@ class OasisProfileGenerator:
         entity_summary: str,
         entity_attributes: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """使用规则生成基础人设"""
+        """Генерирует базовый профиль по правилам."""
         
-        # 根据实体类型生成不同的人设
+        # Выбираем шаблон профиля по типу сущности
         entity_type_lower = entity_type.lower()
         
         if entity_type_lower in ["student", "alumni"]:
@@ -810,10 +791,10 @@ class OasisProfileGenerator:
             return {
                 "bio": f"Official account for {entity_name}. News and updates.",
                 "persona": f"{entity_name} is a media entity that reports news and facilitates public discourse. The account shares timely updates and engages with the audience on current events.",
-                "age": 30,  # 机构虚拟年龄
-                "gender": "other",  # 机构使用other
-                "mbti": "ISTJ",  # 机构风格：严谨保守
-                "country": "中国",
+                "age": 30,
+                "gender": "other",
+                "mbti": "ISTJ",
+                "country": "Не указано",
                 "profession": "Media",
                 "interested_topics": ["General News", "Current Events", "Public Affairs"],
             }
@@ -822,10 +803,10 @@ class OasisProfileGenerator:
             return {
                 "bio": f"Official account of {entity_name}.",
                 "persona": f"{entity_name} is an institutional entity that communicates official positions, announcements, and engages with stakeholders on relevant matters.",
-                "age": 30,  # 机构虚拟年龄
-                "gender": "other",  # 机构使用other
-                "mbti": "ISTJ",  # 机构风格：严谨保守
-                "country": "中国",
+                "age": 30,
+                "gender": "other",
+                "mbti": "ISTJ",
+                "country": "Не указано",
                 "profession": entity_type,
                 "interested_topics": ["Public Policy", "Community", "Official Announcements"],
             }
@@ -844,7 +825,7 @@ class OasisProfileGenerator:
             }
     
     def set_graph_id(self, graph_id: str):
-        """设置图谱ID用于Zep检索"""
+        """Сохраняет graph_id для последующего поиска в Zep."""
         self.graph_id = graph_id
     
     def generate_profiles_from_entities(
@@ -857,53 +838,39 @@ class OasisProfileGenerator:
         realtime_output_path: Optional[str] = None,
         output_platform: str = "reddit"
     ) -> List[OasisAgentProfile]:
-        """
-        批量从实体生成Agent Profile（支持并行生成）
-        
-        Args:
-            entities: 实体列表
-            use_llm: 是否使用LLM生成详细人设
-            progress_callback: 进度回调函数 (current, total, message)
-            graph_id: 图谱ID，用于Zep检索获取更丰富上下文
-            parallel_count: 并行生成数量，默认5
-            realtime_output_path: 实时写入的文件路径（如果提供，每生成一个就写入一次）
-            output_platform: 输出平台格式 ("reddit" 或 "twitter")
-            
-        Returns:
-            Agent Profile列表
-        """
+        """Пакетно генерирует профили агентов из списка сущностей."""
         import concurrent.futures
         from threading import Lock
         
-        # 设置graph_id用于Zep检索
+        # Сохраняем graph_id для поиска в Zep
         if graph_id:
             self.graph_id = graph_id
         
         total = len(entities)
-        profiles = [None] * total  # 预分配列表保持顺序
-        completed_count = [0]  # 使用列表以便在闭包中修改
+        profiles = [None] * total
+        completed_count = [0]
         lock = Lock()
         
-        # 实时写入文件的辅助函数
+        # Вспомогательная функция для промежуточного сохранения
         def save_profiles_realtime():
-            """实时保存已生成的 profiles 到文件"""
+            """Сохраняет уже готовые профили на диск по мере генерации."""
             if not realtime_output_path:
                 return
             
             with lock:
-                # 过滤出已生成的 profiles
+                # Берем только уже готовые профили
                 existing_profiles = [p for p in profiles if p is not None]
                 if not existing_profiles:
                     return
                 
                 try:
                     if output_platform == "reddit":
-                        # Reddit JSON 格式
+                        # Формат Reddit JSON
                         profiles_data = [p.to_reddit_format() for p in existing_profiles]
                         with open(realtime_output_path, 'w', encoding='utf-8') as f:
                             json.dump(profiles_data, f, ensure_ascii=False, indent=2)
                     else:
-                        # Twitter CSV 格式
+                        # Формат Twitter CSV
                         import csv
                         profiles_data = [p.to_twitter_format() for p in existing_profiles]
                         if profiles_data:
@@ -913,10 +880,10 @@ class OasisProfileGenerator:
                                 writer.writeheader()
                                 writer.writerows(profiles_data)
                 except Exception as e:
-                    logger.warning(f"实时保存 profiles 失败: {e}")
+                    logger.warning(f"Не удалось выполнить промежуточное сохранение профилей: {e}")
         
         def generate_single_profile(idx: int, entity: EntityNode) -> tuple:
-            """生成单个profile的工作函数"""
+            """Генерирует один профиль."""
             entity_type = entity.get_entity_type() or "Entity"
             
             try:
@@ -926,14 +893,14 @@ class OasisProfileGenerator:
                     use_llm=use_llm
                 )
                 
-                # 实时输出生成的人设到控制台和日志
+                # Печатаем сгенерированный профиль в консоль
                 self._print_generated_profile(entity.name, entity_type, profile)
                 
                 return idx, profile, None
                 
             except Exception as e:
-                logger.error(f"生成实体 {entity.name} 的人设失败: {str(e)}")
-                # 创建一个基础profile
+                logger.error(f"Не удалось сгенерировать профиль для сущности {entity.name}: {str(e)}")
+                # Создаем базовый профиль-заглушку
                 fallback_profile = OasisAgentProfile(
                     user_id=idx,
                     user_name=self._generate_username(entity.name),
@@ -945,20 +912,20 @@ class OasisProfileGenerator:
                 )
                 return idx, fallback_profile, str(e)
         
-        logger.info(f"开始并行生成 {total} 个Agent人设（并行数: {parallel_count}）...")
+        logger.info(f"Запускаю параллельную генерацию профилей агентов: total={total}, parallel={parallel_count}")
         print(f"\n{'='*60}")
-        print(f"开始生成Agent人设 - 共 {total} 个实体，并行数: {parallel_count}")
+        print(f"Запуск генерации профилей агентов: сущностей={total}, параллелизм={parallel_count}")
         print(f"{'='*60}\n")
         
-        # 使用线程池并行执行
+        # Выполняем задачи в пуле потоков
         with concurrent.futures.ThreadPoolExecutor(max_workers=parallel_count) as executor:
-            # 提交所有任务
+            # Отправляем задачи в пул
             future_to_entity = {
                 executor.submit(generate_single_profile, idx, entity): (idx, entity)
                 for idx, entity in enumerate(entities)
             }
             
-            # 收集结果
+            # Собираем результаты
             for future in concurrent.futures.as_completed(future_to_entity):
                 idx, entity = future_to_entity[future]
                 entity_type = entity.get_entity_type() or "Entity"
@@ -971,23 +938,23 @@ class OasisProfileGenerator:
                         completed_count[0] += 1
                         current = completed_count[0]
                     
-                    # 实时写入文件
+                    # Промежуточное сохранение
                     save_profiles_realtime()
                     
                     if progress_callback:
                         progress_callback(
                             current, 
                             total, 
-                            f"已完成 {current}/{total}: {entity.name}（{entity_type}）"
+                            f"Готово {current}/{total}: {entity.name} ({entity_type})"
                         )
                     
                     if error:
-                        logger.warning(f"[{current}/{total}] {entity.name} 使用备用人设: {error}")
+                        logger.warning(f"[{current}/{total}] Для {entity.name} использован резервный профиль: {error}")
                     else:
-                        logger.info(f"[{current}/{total}] 成功生成人设: {entity.name} ({entity_type})")
+                        logger.info(f"[{current}/{total}] Профиль успешно создан: {entity.name} ({entity_type})")
                         
                 except Exception as e:
-                    logger.error(f"处理实体 {entity.name} 时发生异常: {str(e)}")
+                    logger.error(f"Ошибка при обработке сущности {entity.name}: {str(e)}")
                     with lock:
                         completed_count[0] += 1
                     profiles[idx] = OasisAgentProfile(
@@ -999,44 +966,44 @@ class OasisProfileGenerator:
                         source_entity_uuid=entity.uuid,
                         source_entity_type=entity_type,
                     )
-                    # 实时写入文件（即使是备用人设）
+                    # Промежуточное сохранение даже для резервного профиля
                     save_profiles_realtime()
         
         print(f"\n{'='*60}")
-        print(f"人设生成完成！共生成 {len([p for p in profiles if p])} 个Agent")
+        print(f"Генерация профилей завершена. Создано агентов: {len([p for p in profiles if p])}")
         print(f"{'='*60}\n")
         
         return profiles
     
     def _print_generated_profile(self, entity_name: str, entity_type: str, profile: OasisAgentProfile):
-        """实时输出生成的人设到控制台（完整内容，不截断）"""
+        """Выводит полный профиль в консоль без усечения."""
         separator = "-" * 70
         
-        # 构建完整输出内容（不截断）
-        topics_str = ', '.join(profile.interested_topics) if profile.interested_topics else '无'
+        # Формируем полный вывод
+        topics_str = ', '.join(profile.interested_topics) if profile.interested_topics else 'нет'
         
         output_lines = [
             f"\n{separator}",
-            f"[已生成] {entity_name} ({entity_type})",
+            f"[Сгенерировано] {entity_name} ({entity_type})",
             f"{separator}",
-            f"用户名: {profile.user_name}",
+            f"Имя пользователя: {profile.user_name}",
             f"",
-            f"【简介】",
+            f"Краткое описание",
             f"{profile.bio}",
             f"",
-            f"【详细人设】",
+            f"Подробный профиль",
             f"{profile.persona}",
             f"",
-            f"【基本属性】",
-            f"年龄: {profile.age} | 性别: {profile.gender} | MBTI: {profile.mbti}",
-            f"职业: {profile.profession} | 国家: {profile.country}",
-            f"兴趣话题: {topics_str}",
+            f"Основные параметры",
+            f"Возраст: {profile.age} | Пол: {profile.gender} | MBTI: {profile.mbti}",
+            f"Профессия: {profile.profession} | Страна: {profile.country}",
+            f"Интересы: {topics_str}",
             separator
         ]
         
         output = "\n".join(output_lines)
         
-        # 只输出到控制台（避免重复，logger不再输出完整内容）
+        # Печатаем только в консоль, без дублирования в logger
         print(output)
     
     def save_profiles(
@@ -1045,92 +1012,58 @@ class OasisProfileGenerator:
         file_path: str,
         platform: str = "reddit"
     ):
-        """
-        保存Profile到文件（根据平台选择正确格式）
-        
-        OASIS平台格式要求：
-        - Twitter: CSV格式
-        - Reddit: JSON格式
-        
-        Args:
-            profiles: Profile列表
-            file_path: 文件路径
-            platform: 平台类型 ("reddit" 或 "twitter")
-        """
+        """Сохраняет профили в нужном формате в зависимости от платформы."""
         if platform == "twitter":
             self._save_twitter_csv(profiles, file_path)
         else:
             self._save_reddit_json(profiles, file_path)
     
     def _save_twitter_csv(self, profiles: List[OasisAgentProfile], file_path: str):
-        """
-        保存Twitter Profile为CSV格式（符合OASIS官方要求）
-        
-        OASIS Twitter要求的CSV字段：
-        - user_id: 用户ID（根据CSV顺序从0开始）
-        - name: 用户真实姓名
-        - username: 系统中的用户名
-        - user_char: 详细人设描述（注入到LLM系统提示中，指导Agent行为）
-        - description: 简短的公开简介（显示在用户资料页面）
-        
-        user_char vs description 区别：
-        - user_char: 内部使用，LLM系统提示，决定Agent如何思考和行动
-        - description: 外部显示，其他用户可见的简介
-        """
+        """Сохраняет Twitter-профили в CSV-формате, совместимом с OASIS."""
         import csv
         
-        # 确保文件扩展名是.csv
+        # Гарантируем расширение .csv
         if not file_path.endswith('.csv'):
             file_path = file_path.replace('.json', '.csv')
         
         with open(file_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             
-            # 写入OASIS要求的表头
+            # Заголовки CSV
             headers = ['user_id', 'name', 'username', 'user_char', 'description']
             writer.writerow(headers)
             
-            # 写入数据行
+            # Строки данных
             for idx, profile in enumerate(profiles):
-                # user_char: 完整人设（bio + persona），用于LLM系统提示
+                # Полный профиль для внутреннего использования LLM
                 user_char = profile.bio
                 if profile.persona and profile.persona != profile.bio:
                     user_char = f"{profile.bio} {profile.persona}"
-                # 处理换行符（CSV中用空格替代）
+                # В CSV убираем переводы строк
                 user_char = user_char.replace('\n', ' ').replace('\r', ' ')
                 
-                # description: 简短简介，用于外部显示
+                # Короткое описание для внешнего интерфейса
                 description = profile.bio.replace('\n', ' ').replace('\r', ' ')
                 
                 row = [
-                    idx,                    # user_id: 从0开始的顺序ID
-                    profile.name,           # name: 真实姓名
-                    profile.user_name,      # username: 用户名
-                    user_char,              # user_char: 完整人设（内部LLM使用）
-                    description             # description: 简短简介（外部显示）
+                    idx,
+                    profile.name,
+                    profile.user_name,
+                    user_char,
+                    description
                 ]
                 writer.writerow(row)
         
-        logger.info(f"已保存 {len(profiles)} 个Twitter Profile到 {file_path} (OASIS CSV格式)")
+        logger.info(f"Сохранено Twitter-профилей: {len(profiles)} -> {file_path}")
     
     def _normalize_gender(self, gender: Optional[str]) -> str:
-        """
-        标准化gender字段为OASIS要求的英文格式
-        
-        OASIS要求: male, female, other
-        """
+        """Нормализует поле gender к допустимым значениям OASIS."""
         if not gender:
             return "other"
         
         gender_lower = gender.lower().strip()
         
-        # 中文映射
         gender_map = {
-            "男": "male",
-            "女": "female",
-            "机构": "other",
-            "其他": "other",
-            # 英文已有
             "male": "male",
             "female": "female",
             "other": "other",
@@ -1139,42 +1072,26 @@ class OasisProfileGenerator:
         return gender_map.get(gender_lower, "other")
     
     def _save_reddit_json(self, profiles: List[OasisAgentProfile], file_path: str):
-        """
-        保存Reddit Profile为JSON格式
-        
-        使用与 to_reddit_format() 一致的格式，确保 OASIS 能正确读取。
-        必须包含 user_id 字段，这是 OASIS agent_graph.get_agent() 匹配的关键！
-        
-        必需字段：
-        - user_id: 用户ID（整数，用于匹配 initial_posts 中的 poster_agent_id）
-        - username: 用户名
-        - name: 显示名称
-        - bio: 简介
-        - persona: 详细人设
-        - age: 年龄（整数）
-        - gender: "male", "female", 或 "other"
-        - mbti: MBTI类型
-        - country: 国家
-        """
+        """Сохраняет Reddit-профили в JSON-формате."""
         data = []
         for idx, profile in enumerate(profiles):
-            # 使用与 to_reddit_format() 一致的格式
+            # Используем формат, совместимый с to_reddit_format()
             item = {
-                "user_id": profile.user_id if profile.user_id is not None else idx,  # 关键：必须包含 user_id
+                "user_id": profile.user_id if profile.user_id is not None else idx,
                 "username": profile.user_name,
                 "name": profile.name,
                 "bio": profile.bio[:150] if profile.bio else f"{profile.name}",
                 "persona": profile.persona or f"{profile.name} is a participant in social discussions.",
                 "karma": profile.karma if profile.karma else 1000,
                 "created_at": profile.created_at,
-                # OASIS必需字段 - 确保都有默认值
+                # Обязательные поля OASIS
                 "age": profile.age if profile.age else 30,
                 "gender": self._normalize_gender(profile.gender),
                 "mbti": profile.mbti if profile.mbti else "ISTJ",
-                "country": profile.country if profile.country else "中国",
+                "country": profile.country if profile.country else "Не указано",
             }
             
-            # 可选字段
+            # Опциональные поля
             if profile.profession:
                 item["profession"] = profile.profession
             if profile.interested_topics:
@@ -1185,16 +1102,15 @@ class OasisProfileGenerator:
         with open(file_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         
-        logger.info(f"已保存 {len(profiles)} 个Reddit Profile到 {file_path} (JSON格式，包含user_id字段)")
+        logger.info(f"Сохранено Reddit-профилей: {len(profiles)} -> {file_path}")
     
-    # 保留旧方法名作为别名，保持向后兼容
+    # Старый метод оставлен как алиас
     def save_profiles_to_json(
         self,
         profiles: List[OasisAgentProfile],
         file_path: str,
         platform: str = "reddit"
     ):
-        """[已废弃] 请使用 save_profiles() 方法"""
-        logger.warning("save_profiles_to_json已废弃，请使用save_profiles方法")
+        """Устаревший алиас для save_profiles()."""
+        logger.warning("Метод save_profiles_to_json устарел, используй save_profiles")
         self.save_profiles(profiles, file_path, platform)
-

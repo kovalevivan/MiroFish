@@ -48,7 +48,7 @@
         </div>
       </section>
 
-      <!-- 下半部分：双栏布局 -->
+      <!-- 下半部分：Две панели布局 -->
       <section class="dashboard-section">
         <!-- 左栏：状态与步骤 -->
         <div class="left-panel">
@@ -290,7 +290,7 @@ const scrollToBottom = () => {
   })
 }
 
-// 开始模拟 - 立即跳转，API调用在Process页面进行
+// Запуск симуляции - 立即跳转，API调用在Process页面进行
 const startSimulation = () => {
   if (!canSubmit.value || loading.value) return
   
@@ -535,7 +535,7 @@ const startSimulation = () => {
   border-color: var(--orange);
 }
 
-/* Dashboard 双栏布局 */
+/* Dashboard Две панели布局 */
 .dashboard-section {
   display: flex;
   gap: 60px;

@@ -1,6 +1,5 @@
 """
-LLM客户端封装
-统一使用OpenAI格式调用
+Обертка над LLM-клиентом в формате OpenAI.
 """
 
 import json
@@ -12,7 +11,7 @@ from ..config import Config
 
 
 class LLMClient:
-    """LLM客户端"""
+    """Клиент для работы с LLM."""
     
     def __init__(
         self,
@@ -25,7 +24,7 @@ class LLMClient:
         self.model = model or Config.LLM_MODEL_NAME
         
         if not self.api_key:
-            raise ValueError("LLM_API_KEY 未配置")
+            raise ValueError("LLM_API_KEY is not configured")
         
         self.client = OpenAI(
             api_key=self.api_key,
@@ -40,16 +39,16 @@ class LLMClient:
         response_format: Optional[Dict] = None
     ) -> str:
         """
-        发送聊天请求
+        Отправляет chat-запрос.
         
         Args:
-            messages: 消息列表
-            temperature: 温度参数
-            max_tokens: 最大token数
-            response_format: 响应格式（如JSON模式）
+            messages: список сообщений
+            temperature: температура
+            max_tokens: максимум токенов
+            response_format: формат ответа, например JSON
             
         Returns:
-            模型响应文本
+            Текст ответа модели
         """
         kwargs = {
             "model": self.model,
@@ -63,7 +62,7 @@ class LLMClient:
         
         response = self.client.chat.completions.create(**kwargs)
         content = response.choices[0].message.content
-        # 部分模型（如MiniMax M2.5）会在content中包含<think>思考内容，需要移除
+        # Некоторые модели добавляют блоки <think>, их нужно убрать
         content = re.sub(r'<think>[\s\S]*?</think>', '', content).strip()
         return content
     
@@ -74,15 +73,15 @@ class LLMClient:
         max_tokens: int = 4096
     ) -> Dict[str, Any]:
         """
-        发送聊天请求并返回JSON
+        Отправляет запрос и возвращает JSON.
         
         Args:
-            messages: 消息列表
-            temperature: 温度参数
-            max_tokens: 最大token数
+            messages: список сообщений
+            temperature: температура
+            max_tokens: максимум токенов
             
         Returns:
-            解析后的JSON对象
+            Разобранный JSON-объект
         """
         response = self.chat(
             messages=messages,
@@ -90,7 +89,7 @@ class LLMClient:
             max_tokens=max_tokens,
             response_format={"type": "json_object"}
         )
-        # 清理markdown代码块标记
+        # Убираем обертку markdown-кода
         cleaned_response = response.strip()
         cleaned_response = re.sub(r'^```(?:json)?\s*\n?', '', cleaned_response, flags=re.IGNORECASE)
         cleaned_response = re.sub(r'\n?```\s*$', '', cleaned_response)
@@ -99,5 +98,4 @@ class LLMClient:
         try:
             return json.loads(cleaned_response)
         except json.JSONDecodeError:
-            raise ValueError(f"LLM返回的JSON格式无效: {cleaned_response}")
-
+            raise ValueError(f"LLM returned invalid JSON: {cleaned_response}")

@@ -15,15 +15,15 @@
             :class="{ active: viewMode === mode }"
             @click="viewMode = mode"
           >
-            {{ { graph: '图谱', split: '双栏', workbench: '工作台' }[mode] }}
+            {{ { graph: 'Граф', split: 'Две панели', workbench: 'Рабочая зона' }[mode] }}
           </button>
         </div>
       </div>
 
       <div class="header-right">
         <div class="workflow-step">
-          <span class="step-num">Step 2/5</span>
-          <span class="step-name">环境搭建</span>
+          <span class="step-num">Шаг 2/5</span>
+          <span class="step-name">Настройка среды</span>
         </div>
         <div class="step-divider"></div>
         <span class="status-indicator" :class="statusClass">
@@ -46,7 +46,7 @@
         />
       </div>
 
-      <!-- Right Panel: Step2 环境搭建 -->
+      <!-- Right Panel: Step2 Настройка среды -->
       <div class="panel-wrapper right" :style="rightPanelStyle">
         <Step2EnvSetup
           :simulationId="currentSimulationId"
@@ -109,14 +109,14 @@ const statusClass = computed(() => {
 })
 
 const statusText = computed(() => {
-  if (currentStatus.value === 'error') return 'Error'
-  if (currentStatus.value === 'completed') return 'Ready'
-  return 'Preparing'
+  if (currentStatus.value === 'error') return 'Ошибка'
+  if (currentStatus.value === 'completed') return 'Готово'
+  return 'Подготовка'
 })
 
 // --- Helpers ---
 const addLog = (msg) => {
-  const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) + '.' + new Date().getMilliseconds().toString().padStart(3, '0')
+  const time = new Date().toLocaleTimeString('ru-RU', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }) + '.' + new Date().getMilliseconds().toString().padStart(3, '0')
   systemLogs.value.push({ time, msg })
   if (systemLogs.value.length > 100) {
     systemLogs.value.shift()
@@ -146,13 +146,13 @@ const handleGoBack = () => {
 }
 
 const handleNextStep = (params = {}) => {
-  addLog('进入 Step 3: 开始模拟')
+  addLog('Переход к шагу 3: Запуск симуляции')
   
   // 记录模拟轮数配置
   if (params.maxRounds) {
-    addLog(`自定义模拟轮数: ${params.maxRounds} 轮`)
+    addLog(`Пользовательское число раундов: ${params.maxRounds} раундов`)
   } else {
-    addLog('使用自动配置的模拟轮数')
+    addLog('Используется автоматически рассчитанное число раундов')
   }
   
   // 构建路由参数
@@ -161,7 +161,7 @@ const handleNextStep = (params = {}) => {
     params: { simulationId: currentSimulationId.value }
   }
   
-  // 如果有自定义轮数，通过 query 参数传递
+  // 如果有Свое значение轮数，通过 query 参数传递
   if (params.maxRounds) {
     routeParams.query = { maxRounds: params.maxRounds }
   }
@@ -184,7 +184,7 @@ const checkAndStopRunningSimulation = async () => {
     const envStatusRes = await getEnvStatus({ simulation_id: currentSimulationId.value })
     
     if (envStatusRes.success && envStatusRes.data?.env_alive) {
-      addLog('检测到模拟环境正在运行，正在关闭...')
+      addLog('Обнаружена работающая среда симуляции, закрываю...')
       
       // 尝试优雅关闭模拟环境
       try {
@@ -194,14 +194,14 @@ const checkAndStopRunningSimulation = async () => {
         })
         
         if (closeRes.success) {
-          addLog('✓ 模拟环境已关闭')
+          addLog('✓ Среда симуляции закрыта')
         } else {
-          addLog(`关闭模拟环境失败: ${closeRes.error || '未知错误'}`)
+          addLog(`Не удалось закрыть среду симуляции: ${closeRes.error || 'неизвестная ошибка'}`)
           // 如果优雅关闭失败，尝试强制停止
           await forceStopSimulation()
         }
       } catch (closeErr) {
-        addLog(`关闭模拟环境异常: ${closeErr.message}`)
+        addLog(`Ошибка при закрытии среды симуляции: ${closeErr.message}`)
         // 如果优雅关闭异常，尝试强制停止
         await forceStopSimulation()
       }
@@ -209,13 +209,13 @@ const checkAndStopRunningSimulation = async () => {
       // 环境未运行，但可能进程还在，检查模拟状态
       const simRes = await getSimulation(currentSimulationId.value)
       if (simRes.success && simRes.data?.status === 'running') {
-        addLog('检测到模拟状态为运行中，正在停止...')
+        addLog('Симуляция все еще выполняется, останавливаю...')
         await forceStopSimulation()
       }
     }
   } catch (err) {
     // 检查环境状态失败不影响后续流程
-    console.warn('检查模拟状态失败:', err)
+    console.warn('Не удалось проверить состояние симуляции:', err)
   }
 }
 
@@ -226,18 +226,18 @@ const forceStopSimulation = async () => {
   try {
     const stopRes = await stopSimulation({ simulation_id: currentSimulationId.value })
     if (stopRes.success) {
-      addLog('✓ 模拟已强制停止')
+      addLog('✓ Симуляция принудительно остановлена')
     } else {
-      addLog(`强制停止模拟失败: ${stopRes.error || '未知错误'}`)
+      addLog(`强制Не удалось остановить симуляцию: ${stopRes.error || 'неизвестная ошибка'}`)
     }
   } catch (err) {
-    addLog(`强制停止模拟异常: ${err.message}`)
+    addLog(`Ошибка при принудительной остановке симуляции: ${err.message}`)
   }
 }
 
 const loadSimulationData = async () => {
   try {
-    addLog(`加载模拟数据: ${currentSimulationId.value}`)
+    addLog(`Загрузка данных симуляции: ${currentSimulationId.value}`)
     
     // 获取 simulation 信息
     const simRes = await getSimulation(currentSimulationId.value)
@@ -249,7 +249,7 @@ const loadSimulationData = async () => {
         const projRes = await getProject(simData.project_id)
         if (projRes.success && projRes.data) {
           projectData.value = projRes.data
-          addLog(`项目加载成功: ${projRes.data.project_id}`)
+          addLog(`Проект загружен: ${projRes.data.project_id}`)
           
           // 获取 graph 数据
           if (projRes.data.graph_id) {
@@ -258,10 +258,10 @@ const loadSimulationData = async () => {
         }
       }
     } else {
-      addLog(`加载模拟数据失败: ${simRes.error || '未知错误'}`)
+      addLog(`Не удалось загрузить данные симуляции: ${simRes.error || 'неизвестная ошибка'}`)
     }
   } catch (err) {
-    addLog(`加载异常: ${err.message}`)
+    addLog(`Ошибка загрузки: ${err.message}`)
   }
 }
 
@@ -271,10 +271,10 @@ const loadGraph = async (graphId) => {
     const res = await getGraphData(graphId)
     if (res.success) {
       graphData.value = res.data
-      addLog('图谱数据加载成功')
+      addLog('Данные графа загружены')
     }
   } catch (err) {
-    addLog(`图谱加载失败: ${err.message}`)
+    addLog(`Не удалось загрузить граф: ${err.message}`)
   } finally {
     graphLoading.value = false
   }
@@ -287,7 +287,7 @@ const refreshGraph = () => {
 }
 
 onMounted(async () => {
-  addLog('SimulationView 初始化')
+  addLog('SimulationView Инициализация')
   
   // 检查并关闭正在运行的模拟（用户从 Step 3 返回时）
   await checkAndStopRunningSimulation()
@@ -431,4 +431,3 @@ onMounted(async () => {
   border-right: 1px solid #EAEAEA;
 }
 </style>
-

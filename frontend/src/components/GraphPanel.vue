@@ -1,21 +1,21 @@
 <template>
   <div class="graph-panel">
     <div class="panel-header">
-      <span class="panel-title">Graph Relationship Visualization</span>
+      <span class="panel-title">Визуализация графа связей</span>
       <!-- 顶部工具栏 (Internal Top Right) -->
       <div class="header-tools">
-        <button class="tool-btn" @click="$emit('refresh')" :disabled="loading" title="刷新图谱">
+        <button class="tool-btn" @click="$emit('refresh')" :disabled="loading" title="Обновить граф">
           <span class="icon-refresh" :class="{ 'spinning': loading }">↻</span>
-          <span class="btn-text">Refresh</span>
+          <span class="btn-text">Обновить</span>
         </button>
-        <button class="tool-btn" @click="$emit('toggle-maximize')" title="最大化/还原">
+        <button class="tool-btn" @click="$emit('toggle-maximize')" title="Развернуть или восстановить">
           <span class="icon-maximize">⛶</span>
         </button>
       </div>
     </div>
     
     <div class="graph-container" ref="graphContainer">
-      <!-- 图谱可视化 -->
+      <!-- Граф可视化 -->
       <div v-if="graphData" class="graph-view">
         <svg ref="graphSvg" class="graph-svg"></svg>
         
@@ -27,7 +27,7 @@
               <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-4.44-4.04z" />
             </svg>
           </div>
-          {{ isSimulating ? 'GraphRAG长短期记忆实时更新中' : '实时更新中...' }}
+          {{ isSimulating ? 'Память GraphRAG обновляется в реальном времени' : 'Обновляется в реальном времени...' }}
         </div>
         
         <!-- 模拟结束后的提示 -->
@@ -39,8 +39,8 @@
               <line x1="12" y1="8" x2="12.01" y2="8"></line>
             </svg>
           </div>
-          <span class="hint-text">还有少量内容处理中，建议稍后手动刷新图谱</span>
-          <button class="hint-close-btn" @click="dismissFinishedHint" title="关闭提示">
+          <span class="hint-text">Часть данных еще обрабатывается. Лучше обновить граф немного позже.</span>
+          <button class="hint-close-btn" @click="dismissFinishedHint" title="Закрыть подсказку">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -48,20 +48,20 @@
           </button>
         </div>
         
-        <!-- 节点/边详情面板 -->
+        <!-- узлов/边详情面板 -->
         <div v-if="selectedItem" class="detail-panel">
           <div class="detail-panel-header">
-            <span class="detail-title">{{ selectedItem.type === 'node' ? 'Node Details' : 'Relationship' }}</span>
+            <span class="detail-title">{{ selectedItem.type === 'node' ? 'Детали узла' : 'Связь' }}</span>
             <span v-if="selectedItem.type === 'node'" class="detail-type-badge" :style="{ background: selectedItem.color, color: '#fff' }">
               {{ selectedItem.entityType }}
             </span>
             <button class="detail-close" @click="closeDetailPanel">×</button>
           </div>
           
-          <!-- 节点详情 -->
+          <!-- узлов详情 -->
           <div v-if="selectedItem.type === 'node'" class="detail-content">
             <div class="detail-row">
-              <span class="detail-label">Name:</span>
+              <span class="detail-label">Название:</span>
               <span class="detail-value">{{ selectedItem.data.name }}</span>
             </div>
             <div class="detail-row">
@@ -69,30 +69,30 @@
               <span class="detail-value uuid-text">{{ selectedItem.data.uuid }}</span>
             </div>
             <div class="detail-row" v-if="selectedItem.data.created_at">
-              <span class="detail-label">Created:</span>
+              <span class="detail-label">Создано:</span>
               <span class="detail-value">{{ formatDateTime(selectedItem.data.created_at) }}</span>
             </div>
             
             <!-- Properties -->
             <div class="detail-section" v-if="selectedItem.data.attributes && Object.keys(selectedItem.data.attributes).length > 0">
-              <div class="section-title">Properties:</div>
+              <div class="section-title">Свойства:</div>
               <div class="properties-list">
                 <div v-for="(value, key) in selectedItem.data.attributes" :key="key" class="property-item">
-                  <span class="property-key">{{ key }}:</span>
-                  <span class="property-value">{{ value || 'None' }}</span>
+                  <span class="property-key">{{ formatPropertyKey(key) }}:</span>
+                  <span class="property-value">{{ formatPropertyValue(value) }}</span>
                 </div>
               </div>
             </div>
             
             <!-- Summary -->
             <div class="detail-section" v-if="selectedItem.data.summary">
-              <div class="section-title">Summary:</div>
+              <div class="section-title">Описание:</div>
               <div class="summary-text">{{ selectedItem.data.summary }}</div>
             </div>
             
             <!-- Labels -->
             <div class="detail-section" v-if="selectedItem.data.labels && selectedItem.data.labels.length > 0">
-              <div class="section-title">Labels:</div>
+              <div class="section-title">Метки:</div>
               <div class="labels-list">
                 <span v-for="label in selectedItem.data.labels" :key="label" class="label-tag">
                   {{ label }}
@@ -106,8 +106,8 @@
             <!-- 自环组详情 -->
             <template v-if="selectedItem.data.isSelfLoopGroup">
               <div class="edge-relation-header self-loop-header">
-                {{ selectedItem.data.source_name }} - Self Relations
-                <span class="self-loop-count">{{ selectedItem.data.selfLoopCount }} items</span>
+                {{ selectedItem.data.source_name }} - Самосвязи
+                <span class="self-loop-count">{{ selectedItem.data.selfLoopCount }} шт.</span>
               </div>
               
               <div class="self-loop-list">
@@ -122,7 +122,7 @@
                     @click="toggleSelfLoop(loop.uuid || idx)"
                   >
                     <span class="self-loop-index">#{{ idx + 1 }}</span>
-                    <span class="self-loop-name">{{ loop.name || loop.fact_type || 'RELATED' }}</span>
+                    <span class="self-loop-name">{{ loop.name || loop.fact_type || 'СВЯЗАНО' }}</span>
                     <span class="self-loop-toggle">{{ expandedSelfLoops.has(loop.uuid || idx) ? '−' : '+' }}</span>
                   </div>
                   
@@ -132,19 +132,19 @@
                       <span class="detail-value uuid-text">{{ loop.uuid }}</span>
                     </div>
                     <div class="detail-row" v-if="loop.fact">
-                      <span class="detail-label">Fact:</span>
+                      <span class="detail-label">Факт:</span>
                       <span class="detail-value fact-text">{{ loop.fact }}</span>
                     </div>
                     <div class="detail-row" v-if="loop.fact_type">
-                      <span class="detail-label">Type:</span>
+                      <span class="detail-label">Тип:</span>
                       <span class="detail-value">{{ loop.fact_type }}</span>
                     </div>
                     <div class="detail-row" v-if="loop.created_at">
-                      <span class="detail-label">Created:</span>
+                      <span class="detail-label">Создано:</span>
                       <span class="detail-value">{{ formatDateTime(loop.created_at) }}</span>
                     </div>
                     <div v-if="loop.episodes && loop.episodes.length > 0" class="self-loop-episodes">
-                      <span class="detail-label">Episodes:</span>
+                      <span class="detail-label">Эпизоды:</span>
                       <div class="episodes-list compact">
                         <span v-for="ep in loop.episodes" :key="ep" class="episode-tag small">{{ ep }}</span>
                       </div>
@@ -157,7 +157,7 @@
             <!-- 普通边详情 -->
             <template v-else>
               <div class="edge-relation-header">
-                {{ selectedItem.data.source_name }} → {{ selectedItem.data.name || 'RELATED_TO' }} → {{ selectedItem.data.target_name }}
+                {{ selectedItem.data.source_name }} → {{ selectedItem.data.name || 'СВЯЗАНО_С' }} → {{ selectedItem.data.target_name }}
               </div>
               
               <div class="detail-row">
@@ -165,21 +165,21 @@
                 <span class="detail-value uuid-text">{{ selectedItem.data.uuid }}</span>
               </div>
               <div class="detail-row">
-                <span class="detail-label">Label:</span>
-                <span class="detail-value">{{ selectedItem.data.name || 'RELATED_TO' }}</span>
+                <span class="detail-label">Метка:</span>
+                <span class="detail-value">{{ selectedItem.data.name || 'СВЯЗАНО_С' }}</span>
               </div>
               <div class="detail-row">
-                <span class="detail-label">Type:</span>
-                <span class="detail-value">{{ selectedItem.data.fact_type || 'Unknown' }}</span>
+                <span class="detail-label">Тип:</span>
+                <span class="detail-value">{{ selectedItem.data.fact_type || 'Неизвестно' }}</span>
               </div>
               <div class="detail-row" v-if="selectedItem.data.fact">
-                <span class="detail-label">Fact:</span>
+                <span class="detail-label">Факт:</span>
                 <span class="detail-value fact-text">{{ selectedItem.data.fact }}</span>
               </div>
               
               <!-- Episodes -->
               <div class="detail-section" v-if="selectedItem.data.episodes && selectedItem.data.episodes.length > 0">
-                <div class="section-title">Episodes:</div>
+                <div class="section-title">Эпизоды:</div>
                 <div class="episodes-list">
                   <span v-for="ep in selectedItem.data.episodes" :key="ep" class="episode-tag">
                     {{ ep }}
@@ -188,11 +188,11 @@
               </div>
               
               <div class="detail-row" v-if="selectedItem.data.created_at">
-                <span class="detail-label">Created:</span>
+                <span class="detail-label">Создано:</span>
                 <span class="detail-value">{{ formatDateTime(selectedItem.data.created_at) }}</span>
               </div>
               <div class="detail-row" v-if="selectedItem.data.valid_at">
-                <span class="detail-label">Valid From:</span>
+                <span class="detail-label">Действует с:</span>
                 <span class="detail-value">{{ formatDateTime(selectedItem.data.valid_at) }}</span>
               </div>
             </template>
@@ -203,19 +203,19 @@
       <!-- 加载状态 -->
       <div v-else-if="loading" class="graph-state">
         <div class="loading-spinner"></div>
-        <p>图谱数据加载中...</p>
+        <p>Загрузка данных графа...</p>
       </div>
       
-      <!-- 等待/空状态 -->
+      <!-- Ожидание/空状态 -->
       <div v-else class="graph-state">
         <div class="empty-icon">❖</div>
-        <p class="empty-text">等待本体生成...</p>
+        <p class="empty-text">Ожидание генерации онтологии...</p>
       </div>
     </div>
 
     <!-- 底部图例 (Bottom Left) -->
     <div v-if="graphData && entityTypes.length" class="graph-legend">
-      <span class="legend-title">Entity Types</span>
+      <span class="legend-title">Типы сущностей</span>
       <div class="legend-items">
         <div class="legend-item" v-for="type in entityTypes" :key="type.name">
           <span class="legend-dot" :style="{ background: type.color }"></span>
@@ -230,7 +230,7 @@
         <input type="checkbox" v-model="showEdgeLabels" />
         <span class="slider"></span>
       </label>
-      <span class="toggle-label">Show Edge Labels</span>
+      <span class="toggle-label">Показывать подписи связей</span>
     </div>
   </div>
 </template>
@@ -281,7 +281,7 @@ const toggleSelfLoop = (id) => {
   expandedSelfLoops.value = newSet
 }
 
-// 计算实体类型用于图例
+// 计算Типы сущностей用于图例
 const entityTypes = computed(() => {
   if (!props.graphData?.nodes) return []
   const typeMap = {}
@@ -298,22 +298,122 @@ const entityTypes = computed(() => {
   return Object.values(typeMap)
 })
 
-// 格式化时间
+// Форматирование даты и времени
 const formatDateTime = (dateStr) => {
   if (!dateStr) return ''
   try {
     const date = new Date(dateStr)
-    return date.toLocaleString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
+    return date.toLocaleString('ru-RU', {
+      day: 'numeric',
+      month: 'short',
       year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true 
+      hour: '2-digit',
+      minute: '2-digit'
     })
   } catch {
     return dateStr
   }
+}
+
+const PROPERTY_LABELS = {
+  agency_name: 'Название ведомства',
+  jurisdiction_level: 'Уровень юрисдикции',
+  official_stance: 'Официальная позиция',
+  customer_support_channel: 'Канал клиентской поддержки',
+  industry_sector: 'Отрасль',
+  revenue_model: 'Модель выручки',
+  encryption_standard: 'Стандарт шифрования',
+  platform_name: 'Название платформы',
+  user_base_size: 'Размер пользовательской базы',
+  audience_reach: 'Охват аудитории',
+  editorial_policy: 'Редакционная политика',
+  media_type: 'Тип медиа',
+  name: 'Название',
+  summary: 'Описание',
+  description: 'Описание',
+  role: 'Роль',
+  profession: 'Профессия',
+  organization: 'Организация',
+  location: 'Локация',
+  country: 'Страна',
+  city: 'Город',
+  age: 'Возраст',
+  gender: 'Пол',
+  influence: 'Влияние',
+  influence_weight: 'Вес влияния',
+  sentiment: 'Тональность',
+  sentiment_bias: 'Эмоциональный вектор',
+  stance: 'Позиция'
+}
+
+const PROPERTY_WORD_LABELS = {
+  agency: 'ведомства',
+  age: 'возраст',
+  base: 'база',
+  channel: 'канал',
+  city: 'город',
+  country: 'страна',
+  customer: 'клиентской',
+  description: 'описание',
+  encryption: 'шифрования',
+  gender: 'пол',
+  industry: 'отрасль',
+  influence: 'влияние',
+  jurisdiction: 'юрисдикции',
+  level: 'уровень',
+  location: 'локация',
+  media: 'медиа',
+  model: 'модель',
+  name: 'название',
+  occupation: 'род занятий',
+  official: 'официальная',
+  organization: 'организация',
+  audience: 'аудитории',
+  platform: 'платформы',
+  profession: 'профессия',
+  policy: 'политика',
+  reach: 'охват',
+  revenue: 'выручки',
+  role: 'роль',
+  sector: 'сектор',
+  sentiment: 'тональность',
+  size: 'размер',
+  stance: 'позиция',
+  standard: 'стандарт',
+  summary: 'описание',
+  support: 'поддержки',
+  type: 'тип',
+  user: 'пользовательской',
+  weight: 'вес'
+}
+
+const formatPropertyKey = (key) => {
+  if (!key) return ''
+  const normalizedKey = key
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[\s-]+/g, '_')
+    .toLowerCase()
+
+  if (PROPERTY_LABELS[normalizedKey]) return PROPERTY_LABELS[normalizedKey]
+
+  return normalizedKey
+    .split('_')
+    .filter(Boolean)
+    .map(part => PROPERTY_WORD_LABELS[part] || part)
+    .map((part, index) => index === 0 ? part.charAt(0).toUpperCase() + part.slice(1) : part)
+    .join(' ')
+}
+
+const formatPropertyValue = (value) => {
+  if (value === null || value === undefined) return 'Нет данных'
+
+  const text = String(value).trim()
+  if (!text || text.toLowerCase() === 'null' || text.toLowerCase() === 'undefined') {
+    return 'Нет данных'
+  }
+
+  return text
 }
 
 const closeDetailPanel = () => {
@@ -742,7 +842,7 @@ const renderGraph = () => {
     // 更新曲线路径
     link.attr('d', d => getLinkPath(d))
     
-    // 更新边标签位置（无旋转，水平显示更清晰）
+    // 更新边标签位置（Нет旋转，水平显示更清晰）
     linkLabels.each(function(d) {
       const mid = getLinkMidpoint(d)
       d3.select(this)

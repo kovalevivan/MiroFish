@@ -1,6 +1,4 @@
-"""
-MiroFish Backend - Flask应用工厂
-"""
+"""Flask application factory for the MiroFish backend."""
 
 import os
 import warnings
@@ -17,12 +15,11 @@ from .utils.logger import setup_logger, get_logger
 
 
 def create_app(config_class=Config):
-    """Flask应用工厂函数"""
+    """Создает и настраивает Flask-приложение."""
     app = Flask(__name__)
     app.config.from_object(config_class)
     
-    # 设置JSON编码：确保中文直接显示（而不是 \uXXXX 格式）
-    # Flask >= 2.3 使用 app.json.ensure_ascii，旧版本使用 JSON_AS_ASCII 配置
+    # Отключаем ASCII-экранирование в JSON
     if hasattr(app, 'json') and hasattr(app.json, 'ensure_ascii'):
         app.json.ensure_ascii = False
     
@@ -36,7 +33,7 @@ def create_app(config_class=Config):
     
     if should_log_startup:
         logger.info("=" * 50)
-        logger.info("MiroFish Backend 启动中...")
+        logger.info("Starting MiroFish backend...")
         logger.info("=" * 50)
     
     # 启用CORS
@@ -46,20 +43,20 @@ def create_app(config_class=Config):
     from .services.simulation_runner import SimulationRunner
     SimulationRunner.register_cleanup()
     if should_log_startup:
-        logger.info("已注册模拟进程清理函数")
+        logger.info("Registered simulation process cleanup hooks")
     
     # 请求日志中间件
     @app.before_request
     def log_request():
         logger = get_logger('mirofish.request')
-        logger.debug(f"请求: {request.method} {request.path}")
+        logger.debug(f"Request: {request.method} {request.path}")
         if request.content_type and 'json' in request.content_type:
-            logger.debug(f"请求体: {request.get_json(silent=True)}")
+            logger.debug(f"Payload: {request.get_json(silent=True)}")
     
     @app.after_request
     def log_response(response):
         logger = get_logger('mirofish.request')
-        logger.debug(f"响应: {response.status_code}")
+        logger.debug(f"Response: {response.status_code}")
         return response
     
     # 注册蓝图
@@ -74,7 +71,6 @@ def create_app(config_class=Config):
         return {'status': 'ok', 'service': 'MiroFish Backend'}
     
     if should_log_startup:
-        logger.info("MiroFish Backend 启动完成")
+        logger.info("MiroFish backend started")
     
     return app
-
