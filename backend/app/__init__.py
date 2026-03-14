@@ -66,6 +66,10 @@ def create_app(config_class=Config):
     app.register_blueprint(report_bp, url_prefix='/api/report')
     
     # 健康检查
+    @app.route('/')
+    def root():
+        return {'status': 'ok', 'service': 'MiroFish Backend'}
+
     @app.route('/health')
     def health():
         return {'status': 'ok', 'service': 'MiroFish Backend'}
