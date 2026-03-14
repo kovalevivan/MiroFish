@@ -66,6 +66,8 @@ if sys.platform == 'win32':
 
 import argparse
 import asyncio
+import contextlib
+import contextvars
 import json
 import logging
 import multiprocessing
@@ -162,6 +164,8 @@ try:
     from camel.models import ModelFactory
     from camel.types import ModelPlatformType
     import oasis
+    import oasis.social_agent.agent_environment as oasis_agent_environment
+    import oasis.social_platform.database as oasis_database
     from oasis import (
         ActionType,
         LLMAction,
@@ -173,6 +177,33 @@ except ImportError as e:
     print(f"错误: 缺少依赖 {e}")
     print("请先安装: pip install oasis-ai camel-ai")
     sys.exit(1)
+
+
+_oasis_db_path_ctx: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "oasis_db_path_override",
+    default=None,
+)
+_original_oasis_get_db_path = oasis_database.get_db_path
+
+
+def _patched_oasis_get_db_path() -> str:
+    db_path = _oasis_db_path_ctx.get()
+    if db_path:
+        return db_path
+    return _original_oasis_get_db_path()
+
+
+oasis_database.get_db_path = _patched_oasis_get_db_path
+oasis_agent_environment.get_db_path = _patched_oasis_get_db_path
+
+
+@contextlib.contextmanager
+def use_oasis_db_path(db_path: str):
+    token = _oasis_db_path_ctx.set(db_path)
+    try:
+        yield
+    finally:
+        _oasis_db_path_ctx.reset(token)
 
 
 # Twitter可用动作（不包含INTERVIEW，INTERVIEW只能通过ManualAction手动触发）
@@ -314,6 +345,13 @@ class ParallelIPCHandler:
             return self.reddit_env, self.reddit_agent_graph, "reddit"
         else:
             return None, None, None
+
+    def _get_platform_db_path(self, platform: str) -> Optional[str]:
+        if platform == "twitter":
+            return os.path.join(self.simulation_dir, "twitter_simulation.db")
+        if platform == "reddit":
+            return os.path.join(self.simulation_dir, "reddit_simulation.db")
+        return None
     
     async def _interview_single_platform(self, agent_id: int, prompt: str, platform: str) -> Dict[str, Any]:
         """
@@ -334,7 +372,9 @@ class ParallelIPCHandler:
                 action_args={"prompt": prompt}
             )
             actions = {agent: interview_action}
-            await env.step(actions)
+            db_path = self._get_platform_db_path(actual_platform)
+            with use_oasis_db_path(db_path) if db_path else contextlib.nullcontext():
+                await env.step(actions)
             
             result = self._get_interview_result(agent_id, actual_platform)
             result["platform"] = actual_platform
@@ -467,7 +507,9 @@ class ParallelIPCHandler:
                         print(f"  警告: 无法获取Twitter Agent {agent_id}: {e}")
                 
                 if twitter_actions:
-                    await self.twitter_env.step(twitter_actions)
+                    twitter_db_path = self._get_platform_db_path("twitter")
+                    with use_oasis_db_path(twitter_db_path) if twitter_db_path else contextlib.nullcontext():
+                        await self.twitter_env.step(twitter_actions)
                     
                     for interview in twitter_interviews:
                         agent_id = interview.get("agent_id")
@@ -494,7 +536,9 @@ class ParallelIPCHandler:
                         print(f"  警告: 无法获取Reddit Agent {agent_id}: {e}")
                 
                 if reddit_actions:
-                    await self.reddit_env.step(reddit_actions)
+                    reddit_db_path = self._get_platform_db_path("reddit")
+                    with use_oasis_db_path(reddit_db_path) if reddit_db_path else contextlib.nullcontext():
+                        await self.reddit_env.step(reddit_actions)
                     
                     for interview in reddit_interviews:
                         agent_id = interview.get("agent_id")
@@ -1097,6 +1141,7 @@ class PlatformSimulation:
         self.env = None
         self.agent_graph = None
         self.total_actions = 0
+        self.db_path = None
 
 
 async def run_twitter_simulation(
@@ -1153,6 +1198,7 @@ async def run_twitter_simulation(
         db_path = os.path.join(simulation_dir, "twitter_simulation.db")
         if os.path.exists(db_path):
             os.remove(db_path)
+        result.db_path = db_path
         
         result.env = oasis.make(
             agent_graph=result.agent_graph,
@@ -1161,7 +1207,8 @@ async def run_twitter_simulation(
             semaphore=30,  # 限制最大并发 LLM 请求数，防止 API 过载
         )
         
-        await result.env.reset()
+        with use_oasis_db_path(db_path):
+            await result.env.reset()
         log_info("环境已启动")
         
         if action_logger:
@@ -1205,7 +1252,8 @@ async def run_twitter_simulation(
                     pass
             
             if initial_actions:
-                await result.env.step(initial_actions)
+                with use_oasis_db_path(db_path):
+                    await result.env.step(initial_actions)
                 log_info(f"已发布 {len(initial_actions)} 条初始帖子")
         
         # 记录 round 0 结束
@@ -1254,7 +1302,8 @@ async def run_twitter_simulation(
             
             actions = {agent: LLMAction() for _, agent in active_agents}
             try:
-                await result.env.step(actions)
+                with use_oasis_db_path(db_path):
+                    await result.env.step(actions)
             except Exception:
                 log_info(f"Критическая ошибка env.step() на раунде {round_num + 1}, активных агентов: {len(active_agents)}")
                 raise
@@ -1353,6 +1402,7 @@ async def run_reddit_simulation(
         db_path = os.path.join(simulation_dir, "reddit_simulation.db")
         if os.path.exists(db_path):
             os.remove(db_path)
+        result.db_path = db_path
         
         result.env = oasis.make(
             agent_graph=result.agent_graph,
@@ -1361,7 +1411,8 @@ async def run_reddit_simulation(
             semaphore=30,  # 限制最大并发 LLM 请求数，防止 API 过载
         )
         
-        await result.env.reset()
+        with use_oasis_db_path(db_path):
+            await result.env.reset()
         log_info("环境已启动")
         
         if action_logger:
@@ -1413,7 +1464,8 @@ async def run_reddit_simulation(
                     pass
             
             if initial_actions:
-                await result.env.step(initial_actions)
+                with use_oasis_db_path(db_path):
+                    await result.env.step(initial_actions)
                 log_info(f"已发布 {len(initial_actions)} 条初始帖子")
         
         # 记录 round 0 结束
@@ -1462,7 +1514,8 @@ async def run_reddit_simulation(
             
             actions = {agent: LLMAction() for _, agent in active_agents}
             try:
-                await result.env.step(actions)
+                with use_oasis_db_path(db_path):
+                    await result.env.step(actions)
             except Exception:
                 log_info(f"Критическая ошибка env.step() на раунде {round_num + 1}, активных агентов: {len(active_agents)}")
                 raise
