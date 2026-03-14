@@ -522,7 +522,6 @@ class SimulationRunner:
                 state.completed_at = datetime.now().isoformat()
                 logger.info(f"Симуляция завершена: {simulation_id}")
             else:
-                state.runner_status = RunnerStatus.FAILED
                 # Считываем хвост main log с ошибкой
                 main_log_path = os.path.join(sim_dir, "simulation.log")
                 error_info = ""
@@ -532,8 +531,22 @@ class SimulationRunner:
                             error_info = f.read()[-2000:]
                 except Exception:
                     pass
-                state.error = f"Код завершения процесса: {exit_code}, ошибка: {error_info}"
-                logger.error(f"Симуляция завершилась ошибкой: {simulation_id}, error={state.error}")
+
+                # Если все задействованные платформы уже завершились, считаем симуляцию успешной.
+                # Ненулевой код в этом случае относится к хвосту wait-mode/IPC, а не к самим результатам.
+                if cls._check_all_platforms_completed(state):
+                    state.runner_status = RunnerStatus.COMPLETED
+                    state.completed_at = datetime.now().isoformat()
+                    state.error = None
+                    logger.warning(
+                        f"Процесс симуляции завершился с кодом {exit_code} после завершения всех платформ: {simulation_id}"
+                    )
+                    if error_info:
+                        logger.warning(f"Хвост лога после завершения платформ: {simulation_id}, log={error_info}")
+                else:
+                    state.runner_status = RunnerStatus.FAILED
+                    state.error = f"Код завершения процесса: {exit_code}, ошибка: {error_info}"
+                    logger.error(f"Симуляция завершилась ошибкой: {simulation_id}, error={state.error}")
             
             state.twitter_running = False
             state.reddit_running = False
