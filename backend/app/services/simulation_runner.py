@@ -412,6 +412,7 @@ class SimulationRunner:
             
             cmd = [
                 sys.executable,
+                "-u",
                 script_path,
                 "--config", config_path,
             ]
@@ -428,6 +429,7 @@ class SimulationRunner:
             env = os.environ.copy()
             env['PYTHONUTF8'] = '1'
             env['PYTHONIOENCODING'] = 'utf-8'
+            env['PYTHONUNBUFFERED'] = '1'
             
             # Рабочая директория - каталог симуляции; создаем новую группу процессов
             process = subprocess.Popen(

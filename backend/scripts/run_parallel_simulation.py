@@ -72,6 +72,7 @@ import multiprocessing
 import random
 import signal
 import sqlite3
+import traceback
 import warnings
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple
@@ -1689,6 +1690,10 @@ if __name__ == "__main__":
         print("\n程序被中断")
     except SystemExit:
         pass
+    except Exception:
+        print("\n模拟进程发生未处理异常:")
+        traceback.print_exc()
+        sys.exit(1)
     finally:
         # 清理 multiprocessing 资源跟踪器（防止退出时的警告）
         try:
