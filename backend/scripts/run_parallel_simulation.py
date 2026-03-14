@@ -1706,8 +1706,12 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\n程序被中断")
-    except SystemExit:
-        pass
+    except SystemExit as e:
+        exit_code = e.code if isinstance(e.code, int) else 1
+        if exit_code not in (0, None):
+            print(f"\n模拟进程通过 SystemExit 异常退出，code={exit_code}")
+            traceback.print_exc()
+            sys.exit(exit_code)
     except Exception:
         print("\n模拟进程发生未处理异常:")
         traceback.print_exc()
