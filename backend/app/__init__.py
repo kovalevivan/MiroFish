@@ -1,6 +1,7 @@
 """Flask application factory for the MiroFish backend."""
 
 import os
+import importlib
 import warnings
 
 # 抑制 multiprocessing resource_tracker 的警告（来自第三方库如 transformers）
@@ -53,20 +54,44 @@ def create_app(config_class=Config):
         logger.debug(f"Response: {response.status_code}")
         return response
     
-    # 注册蓝图
+    startup_errors = []
+
+    # Регистрируем blueprints по одному, чтобы единичный импорт не валил весь backend.
     from .api import graph_bp, simulation_bp, report_bp
-    app.register_blueprint(graph_bp, url_prefix='/api/graph')
-    app.register_blueprint(simulation_bp, url_prefix='/api/simulation')
-    app.register_blueprint(report_bp, url_prefix='/api/report')
+    blueprint_modules = [
+        (".api.graph", graph_bp, "/api/graph"),
+        (".api.simulation", simulation_bp, "/api/simulation"),
+        (".api.report", report_bp, "/api/report"),
+    ]
+
+    for module_name, blueprint, url_prefix in blueprint_modules:
+        try:
+            importlib.import_module(module_name, __name__)
+            app.register_blueprint(blueprint, url_prefix=url_prefix)
+        except Exception as exc:
+            error_info = {
+                "module": module_name,
+                "error": str(exc),
+            }
+            startup_errors.append(error_info)
+            logger.exception(f"Не удалось зарегистрировать {module_name}: {exc}")
     
     # 健康检查
     @app.route('/')
     def root():
-        return {'status': 'ok', 'service': 'MiroFish Backend'}
+        status = 'ok' if not startup_errors else 'degraded'
+        response = {'status': status, 'service': 'MiroFish Backend'}
+        if startup_errors:
+            response['startup_errors'] = startup_errors
+        return response
 
     @app.route('/health')
     def health():
-        return {'status': 'ok', 'service': 'MiroFish Backend'}
+        status = 'ok' if not startup_errors else 'degraded'
+        response = {'status': status, 'service': 'MiroFish Backend'}
+        if startup_errors:
+            response['startup_errors'] = startup_errors
+        return response
     
     if should_log_startup:
         logger.info("MiroFish backend started")
