@@ -7,11 +7,11 @@ import threading
 from typing import Dict, Any, List, Optional, Callable
 from dataclasses import dataclass
 
-from zep_cloud.client import Zep
 from zep_cloud import EpisodeData, EntityEdgeSourceTarget
 
 from ..config import Config
 from ..models.task import TaskManager, TaskStatus
+from ..utils.zep_client import create_zep_client
 from ..utils.zep_paging import fetch_all_nodes, fetch_all_edges
 from .text_processor import TextProcessor
 
@@ -44,7 +44,7 @@ class GraphBuilderService:
         if not self.api_key:
             raise ValueError("ZEP_API_KEY не настроен")
         
-        self.client = Zep(api_key=self.api_key)
+        self.client = create_zep_client(api_key=self.api_key)
         self.task_manager = TaskManager()
     
     def build_graph_async(

@@ -30,6 +30,9 @@ class Config:
     
     # Параметры Zep
     ZEP_API_KEY = os.environ.get('ZEP_API_KEY')
+    ZEP_API_URL = os.environ.get('ZEP_API_URL', '')
+    ZEP_PROXY_URL = os.environ.get('ZEP_PROXY_URL', '')
+    ZEP_TIMEOUT_SECONDS = float(os.environ.get('ZEP_TIMEOUT_SECONDS', '60'))
     
     # Параметры загрузки файлов
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB
