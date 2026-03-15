@@ -154,6 +154,15 @@ class OasisProfileGenerator:
         "China", "US", "UK", "Japan", "Germany", "France", 
         "Canada", "Australia", "Brazil", "India", "South Korea"
     ]
+
+    CYRILLIC_TO_LATIN = {
+        "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e",
+        "ё": "e", "ж": "zh", "з": "z", "и": "i", "й": "y", "к": "k",
+        "л": "l", "м": "m", "н": "n", "о": "o", "п": "p", "р": "r",
+        "с": "s", "т": "t", "у": "u", "ф": "f", "х": "kh", "ц": "ts",
+        "ч": "ch", "ш": "sh", "щ": "sch", "ъ": "", "ы": "y", "ь": "",
+        "э": "e", "ю": "yu", "я": "ya",
+    }
     
     # Персональные сущности
     INDIVIDUAL_ENTITY_TYPES = [
@@ -208,7 +217,7 @@ class OasisProfileGenerator:
         entity_type = entity.get_entity_type() or "Entity"
         
         # Базовая информация
-        name = entity.name
+        name = self._generate_profile_display_name(entity.name)
         user_name = self._generate_username(name)
         
         # Формируем контекст
@@ -236,8 +245,8 @@ class OasisProfileGenerator:
             user_id=user_id,
             user_name=user_name,
             name=name,
-            bio=profile_data.get("bio", f"{entity_type}: {name}"),
-            persona=profile_data.get("persona", entity.summary or f"A {entity_type} named {name}."),
+            bio=profile_data.get("bio", f"{entity_type}: {entity.name}"),
+            persona=profile_data.get("persona", entity.summary or f"A {entity_type} named {entity.name}."),
             karma=profile_data.get("karma", random.randint(500, 5000)),
             friend_count=profile_data.get("friend_count", random.randint(50, 500)),
             follower_count=profile_data.get("follower_count", random.randint(100, 1000)),
@@ -252,13 +261,52 @@ class OasisProfileGenerator:
             source_entity_type=entity_type,
         )
     
+    def _transliterate_to_latin(self, text: str) -> str:
+        """Преобразует кириллицу в латиницу без смыслового перевода."""
+        result = []
+        for char in text:
+            lower_char = char.lower()
+            if lower_char in self.CYRILLIC_TO_LATIN:
+                latin = self.CYRILLIC_TO_LATIN[lower_char]
+                if char.isupper() and latin:
+                    latin = latin[0].upper() + latin[1:]
+                result.append(latin)
+            elif char.isascii():
+                result.append(char)
+            else:
+                result.append(" ")
+        return ''.join(result)
+
+    def _normalize_ascii_words(self, text: str, separator: str = " ") -> str:
+        cleaned = []
+        prev_was_sep = False
+        for char in text:
+            if char.isascii() and char.isalnum():
+                cleaned.append(char)
+                prev_was_sep = False
+            else:
+                if not prev_was_sep:
+                    cleaned.append(separator)
+                    prev_was_sep = True
+        normalized = ''.join(cleaned).strip(separator)
+        while separator * 2 in normalized:
+            normalized = normalized.replace(separator * 2, separator)
+        return normalized
+
+    def _generate_profile_display_name(self, entity_name: str) -> str:
+        """Формирует правдоподобное латинское имя профиля для соцсетей."""
+        transliterated = self._transliterate_to_latin(entity_name)
+        normalized = self._normalize_ascii_words(transliterated, separator=" ")
+        if not normalized:
+            normalized = "Social Profile"
+        return ' '.join(part.capitalize() for part in normalized.split())
+
     def _generate_username(self, name: str) -> str:
-        """Генерирует имя пользователя."""
-        # 移除特殊字符，转换为小写
-        username = name.lower().replace(" ", "_")
-        username = ''.join(c for c in username if c.isalnum() or c == '_')
-        
-        # 添加随机后缀避免重复
+        """Генерирует ASCII-username, похожий на обычный handle."""
+        username = self._normalize_ascii_words(name.lower(), separator="_")
+        username = username.strip("_")
+        if not username:
+            username = "social_profile"
         suffix = random.randint(100, 999)
         return f"{username}_{suffix}"
     
