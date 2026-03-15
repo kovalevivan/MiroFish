@@ -155,14 +155,22 @@ class OasisProfileGenerator:
         "Canada", "Australia", "Brazil", "India", "South Korea"
     ]
 
-    CYRILLIC_TO_LATIN = {
-        "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e",
-        "ё": "e", "ж": "zh", "з": "z", "и": "i", "й": "y", "к": "k",
-        "л": "l", "м": "m", "н": "n", "о": "o", "п": "p", "р": "r",
-        "с": "s", "т": "t", "у": "u", "ф": "f", "х": "kh", "ц": "ts",
-        "ч": "ch", "ш": "sh", "щ": "sch", "ъ": "", "ы": "y", "ь": "",
-        "э": "e", "ю": "yu", "я": "ya",
-    }
+    ENGLISH_FIRST_NAMES = [
+        "Alex", "Jordan", "Taylor", "Morgan", "Casey", "Riley", "Dylan",
+        "Cameron", "Avery", "Parker", "Logan", "Quinn"
+    ]
+    ENGLISH_LAST_NAMES = [
+        "Miller", "Parker", "Hayes", "Brooks", "Bennett", "Foster", "Reed",
+        "Bailey", "Hunter", "Coleman", "Turner", "Evans"
+    ]
+    ORGANIZATION_PREFIXES = [
+        "Civic", "Public", "Open", "Signal", "North", "Urban", "Daily",
+        "Policy", "Insight", "Forum", "Global", "Modern"
+    ]
+    ORGANIZATION_SUFFIXES = [
+        "Network", "Collective", "Desk", "Digest", "Watch", "Pulse",
+        "Brief", "Studio", "Channel", "Alliance", "Lab", "Report"
+    ]
     
     # Персональные сущности
     INDIVIDUAL_ENTITY_TYPES = [
@@ -217,8 +225,8 @@ class OasisProfileGenerator:
         entity_type = entity.get_entity_type() or "Entity"
         
         # Базовая информация
-        name = self._generate_profile_display_name(entity.name)
-        user_name = self._generate_username(name)
+        generated_name = profile_data.get("display_name") or self._generate_profile_display_name(entity.name, entity_type)
+        user_name = profile_data.get("username") or self._generate_username(generated_name)
         
         # Формируем контекст
         context = self._build_entity_context(entity)
@@ -244,7 +252,7 @@ class OasisProfileGenerator:
         return OasisAgentProfile(
             user_id=user_id,
             user_name=user_name,
-            name=name,
+            name=generated_name,
             bio=profile_data.get("bio", f"{entity_type}: {entity.name}"),
             persona=profile_data.get("persona", entity.summary or f"A {entity_type} named {entity.name}."),
             karma=profile_data.get("karma", random.randint(500, 5000)),
@@ -261,22 +269,6 @@ class OasisProfileGenerator:
             source_entity_type=entity_type,
         )
     
-    def _transliterate_to_latin(self, text: str) -> str:
-        """Преобразует кириллицу в латиницу без смыслового перевода."""
-        result = []
-        for char in text:
-            lower_char = char.lower()
-            if lower_char in self.CYRILLIC_TO_LATIN:
-                latin = self.CYRILLIC_TO_LATIN[lower_char]
-                if char.isupper() and latin:
-                    latin = latin[0].upper() + latin[1:]
-                result.append(latin)
-            elif char.isascii():
-                result.append(char)
-            else:
-                result.append(" ")
-        return ''.join(result)
-
     def _normalize_ascii_words(self, text: str, separator: str = " ") -> str:
         cleaned = []
         prev_was_sep = False
@@ -293,13 +285,11 @@ class OasisProfileGenerator:
             normalized = normalized.replace(separator * 2, separator)
         return normalized
 
-    def _generate_profile_display_name(self, entity_name: str) -> str:
-        """Формирует правдоподобное латинское имя профиля для соцсетей."""
-        transliterated = self._transliterate_to_latin(entity_name)
-        normalized = self._normalize_ascii_words(transliterated, separator=" ")
-        if not normalized:
-            normalized = "Social Profile"
-        return ' '.join(part.capitalize() for part in normalized.split())
+    def _generate_profile_display_name(self, entity_name: str, entity_type: str) -> str:
+        """Формирует правдоподобное англоязычное имя соцпрофиля."""
+        if self._is_individual_entity(entity_type):
+            return f"{random.choice(self.ENGLISH_FIRST_NAMES)} {random.choice(self.ENGLISH_LAST_NAMES)}"
+        return f"{random.choice(self.ORGANIZATION_PREFIXES)} {random.choice(self.ORGANIZATION_SUFFIXES)}"
 
     def _generate_username(self, name: str) -> str:
         """Генерирует ASCII-username, похожий на обычный handle."""
@@ -698,7 +688,13 @@ class OasisProfileGenerator:
     
     def _get_system_prompt(self, is_individual: bool) -> str:
         """Возвращает системный prompt."""
-        base_prompt = "Ты эксперт по созданию реалистичных профилей пользователей соцсетей для симуляции общественных реакций. Сгенерируй детализированный и правдоподобный профиль на русском языке. Возвращай только валидный JSON. Значения строк не должны содержать необработанные переводы строк."
+        base_prompt = (
+            "Ты эксперт по созданию реалистичных профилей пользователей соцсетей для симуляции общественных реакций. "
+            "Сгенерируй детализированный и правдоподобный профиль. "
+            "Текстовые поля bio/persona/profession/country/interested_topics возвращай на русском языке, "
+            "а поля display_name и username делай естественными для Twitter/Reddit и только на латинице. "
+            "Возвращай только валидный JSON. Значения строк не должны содержать необработанные переводы строк."
+        )
         return base_prompt
     
     def _build_individual_persona_prompt(
@@ -726,8 +722,10 @@ class OasisProfileGenerator:
 
 Верни JSON со следующими полями:
 
-1. bio: краткое описание профиля для соцсети, около 200 символов
-2. persona: подробное описание персонажа сплошным текстом, включи:
+1. display_name: правдоподобное имя профиля для Twitter/Reddit, только на латинице, без транслитерации исходного русского названия, выглядит как реальное имя человека
+2. username: реалистичный handle для соцсетей, только ASCII, lowercase, буквы/цифры/подчеркивания, без символа @
+3. bio: краткое описание профиля для соцсети, около 200 символов
+4. persona: подробное описание персонажа сплошным текстом, включи:
    - базовые сведения: возраст, профессию, образование, место проживания
    - биографию: важные эпизоды, связь с событием, социальные связи
    - характер: тип MBTI, ключевые черты, способ выражения эмоций
@@ -735,17 +733,18 @@ class OasisProfileGenerator:
    - позицию по теме: отношение к обсуждаемому вопросу, что может его задеть или вдохновить
    - отличительные детали: любимые выражения, особый опыт, увлечения
    - личную память: как персонаж связан с событием и что уже делал или как реагировал
-3. age: целое число
-4. gender: только "male" или "female"
-5. mbti: тип MBTI, например INTJ или ENFP
-6. country: страна на русском языке
-7. profession: профессия
-8. interested_topics: массив интересующих тем
+5. age: целое число
+6. gender: только "male" или "female"
+7. mbti: тип MBTI, например INTJ или ENFP
+8. country: страна на русском языке
+9. profession: профессия
+10. interested_topics: массив интересующих тем
 
 Важно:
 - значения всех полей должны быть строками, числами или массивом строк без переводов строк внутри значений
+- display_name и username не должны быть транслитерацией исходного русского названия сущности; придумай естественный англоязычный соцпрофиль, который соответствует роли и типу сущности
 - persona должна быть одним связным абзацем
-- весь текст на русском, кроме gender
+- весь текст на русском, кроме gender, display_name и username
 - содержание должно строго соответствовать исходной сущности
 - age должен быть корректным целым числом, gender только "male" или "female"
 """
@@ -775,8 +774,10 @@ class OasisProfileGenerator:
 
 Верни JSON со следующими полями:
 
-1. bio: краткое описание официального аккаунта, сдержанное и профессиональное
-2. persona: подробное описание аккаунта сплошным текстом, включи:
+1. display_name: правдоподобное англоязычное название аккаунта для Twitter/Reddit, только на латинице, не транслитерация исходного названия
+2. username: реалистичный handle для соцсетей, только ASCII, lowercase, буквы/цифры/подчеркивания, без символа @
+3. bio: краткое описание официального аккаунта, сдержанное и профессиональное
+4. persona: подробное описание аккаунта сплошным текстом, включи:
    - сведения об организации: официальное название, природу организации, происхождение, основные функции
    - позиционирование аккаунта: тип аккаунта, целевую аудиторию, ключевую задачу
    - стиль коммуникации: характер формулировок, частые обороты, чувствительные темы
@@ -784,17 +785,18 @@ class OasisProfileGenerator:
    - институциональную позицию: отношение к ключевым вопросам и способ реакции на споры
    - особые примечания: кого представляет, какие у команды привычки ведения аккаунта
    - институциональную память: как организация связана с событием и какие шаги или реакции уже проявляла
-3. age: всегда 30
-4. gender: всегда "other"
-5. mbti: тип MBTI для описания стиля аккаунта
-6. country: страна на русском языке
-7. profession: описание функции или роли организации
-8. interested_topics: массив основных тематик
+5. age: всегда 30
+6. gender: всегда "other"
+7. mbti: тип MBTI для описания стиля аккаунта
+8. country: страна на русском языке
+9. profession: описание функции или роли организации
+10. interested_topics: массив основных тематик
 
 Важно:
 - все значения должны быть строками, числами или массивом строк, без null
+- display_name и username должны выглядеть как реальный англоязычный брендовый соцаккаунт, а не как транслитерация русского названия
 - persona должна быть одним связным абзацем без переводов строк
-- весь текст на русском, кроме gender="other"
+- весь текст на русском, кроме gender="other", display_name и username
 - age должен быть равен 30, gender должен быть строкой "other"
 - тон и содержание должны соответствовать типу институции"""
     
@@ -812,6 +814,8 @@ class OasisProfileGenerator:
         
         if entity_type_lower in ["student", "alumni"]:
             return {
+                "display_name": f"{random.choice(self.ENGLISH_FIRST_NAMES)} {random.choice(self.ENGLISH_LAST_NAMES)}",
+                "username": f"{random.choice(['campus', 'study', 'daily', 'notes'])}_{random.randint(100, 999)}",
                 "bio": f"{entity_type} with interests in academics and social issues.",
                 "persona": f"{entity_name} is a {entity_type.lower()} who is actively engaged in academic and social discussions. They enjoy sharing perspectives and connecting with peers.",
                 "age": random.randint(18, 30),
@@ -824,6 +828,8 @@ class OasisProfileGenerator:
         
         elif entity_type_lower in ["publicfigure", "expert", "faculty"]:
             return {
+                "display_name": f"{random.choice(self.ENGLISH_FIRST_NAMES)} {random.choice(self.ENGLISH_LAST_NAMES)}",
+                "username": f"{random.choice(['policy', 'insight', 'commentary', 'brief'])}_{random.randint(100, 999)}",
                 "bio": f"Expert and thought leader in their field.",
                 "persona": f"{entity_name} is a recognized {entity_type.lower()} who shares insights and opinions on important matters. They are known for their expertise and influence in public discourse.",
                 "age": random.randint(35, 60),
@@ -836,6 +842,8 @@ class OasisProfileGenerator:
         
         elif entity_type_lower in ["mediaoutlet", "socialmediaplatform"]:
             return {
+                "display_name": f"{random.choice(self.ORGANIZATION_PREFIXES)} {random.choice(self.ORGANIZATION_SUFFIXES)}",
+                "username": f"{random.choice(['newsdesk', 'signalfeed', 'dailywire', 'trendwatch'])}_{random.randint(100, 999)}",
                 "bio": f"Official account for {entity_name}. News and updates.",
                 "persona": f"{entity_name} is a media entity that reports news and facilitates public discourse. The account shares timely updates and engages with the audience on current events.",
                 "age": 30,
@@ -848,6 +856,8 @@ class OasisProfileGenerator:
         
         elif entity_type_lower in ["university", "governmentagency", "ngo", "organization"]:
             return {
+                "display_name": f"{random.choice(self.ORGANIZATION_PREFIXES)} {random.choice(self.ORGANIZATION_SUFFIXES)}",
+                "username": f"{random.choice(['publicoffice', 'civicdesk', 'policyforum', 'officialbrief'])}_{random.randint(100, 999)}",
                 "bio": f"Official account of {entity_name}.",
                 "persona": f"{entity_name} is an institutional entity that communicates official positions, announcements, and engages with stakeholders on relevant matters.",
                 "age": 30,
@@ -861,6 +871,8 @@ class OasisProfileGenerator:
         else:
             # 默认人设
             return {
+                "display_name": self._generate_profile_display_name(entity_name, entity_type),
+                "username": f"{random.choice(['social', 'public', 'civic', 'forum'])}_{random.randint(100, 999)}",
                 "bio": entity_summary[:150] if entity_summary else f"{entity_type}: {entity_name}",
                 "persona": entity_summary or f"{entity_name} is a {entity_type.lower()} participating in social discussions.",
                 "age": random.randint(25, 50),
@@ -950,8 +962,8 @@ class OasisProfileGenerator:
                 # Создаем базовый профиль-заглушку
                 fallback_profile = OasisAgentProfile(
                     user_id=idx,
-                    user_name=self._generate_username(entity.name),
-                    name=entity.name,
+                    user_name=self._generate_username(self._generate_profile_display_name(entity.name, entity_type)),
+                    name=self._generate_profile_display_name(entity.name, entity_type),
                     bio=f"{entity_type}: {entity.name}",
                     persona=entity.summary or f"A participant in social discussions.",
                     source_entity_uuid=entity.uuid,
@@ -1006,8 +1018,8 @@ class OasisProfileGenerator:
                         completed_count[0] += 1
                     profiles[idx] = OasisAgentProfile(
                         user_id=idx,
-                        user_name=self._generate_username(entity.name),
-                        name=entity.name,
+                        user_name=self._generate_username(self._generate_profile_display_name(entity.name, entity_type)),
+                        name=self._generate_profile_display_name(entity.name, entity_type),
                         bio=f"{entity_type}: {entity.name}",
                         persona=entity.summary or "A participant in social discussions.",
                         source_entity_uuid=entity.uuid,
